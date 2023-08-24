@@ -1,6 +1,5 @@
-#Thermal compensation
-#Starting date: October 2022
-#Author: Sofia Talleri
+#Thermal compensation Main Python Implementation
+#Author: Sebastian Lang
 
 import pandas as pd
 import numpy as np
@@ -10,7 +9,7 @@ from threading import Thread
 from Machine_General import Machine
 
 MachineName = "EVO_Quinto"                   #machine name
-mode        = "Sim"                   #set mode we are working with, either Sim or Online
+mode        = "Log"                   #set mode we are working with, either Sim or Compensation, or Log? TODO Log is supposed to be Online but without writing
 
 #Data Loading       
         
