@@ -5,15 +5,14 @@ import numpy as np
 from datetime import datetime
 
 #machine specific parameters
-class specs:
+class EVO_100:
 
     def __init__(mc):
-        mc.SensorList = ['1 B WerkstückSpanner links','2 A_axis_Drive_Structure','3 C_axis_Top_Auf_Spindelstock_Mitte','4 C_Axis_Cover','5 Touch_Probe_Holder_Spindle','6 Spindle_Structure_Front','7 B drive gap between gear', ...
-                         '8 B WerkstückSpanner rechts','9 B Drive gearbox','10 Oil Backflow', '11 Env Machine Front','12 Air Workingspace', '13 Env Machine back middle', '14 X drive back down', '15 Bed behind machine left, axis enclosure',...
-                         '16 X structure cast right', '17 Drive grinding spindle','18 Spindle back left casting','19 X Drive middle top','20 bed below front','21 Air back','22 Coolant Backflow']
-        mc.ErrorList = ['X0B'] #TODO Update to pivotes  
-        mc.FilePathTemperature = r'C:\Users\'
-
+        mc.SensorList = ['Oil','Near IC','Spindle','Under Spindle case','Behind Machine','C-axes','Env. Front','Env. Interior','Cooling system','B-axes', 'Under Table']
+        mc.ErrorList = ['X0B']   
+        mc.FilePathTemperature = r'C:\Users\sofit\Desktop\Eth\Bachelor Thesis\BT folder\Measurements\Evo 100\Daten Messung 1 Evo 100\Temperaturverlauf1.xlsx'
+        mc.FilePathDx = r'C:\Users\sofit\Desktop\Eth\Bachelor Thesis\BT folder\Measurements\Evo 100\Daten Messung 1 Evo 100\DXMass Messung 1 def.xlsx'
+        mc.FilePathLatch = r'C:\Users\sofit\Desktop\Eth\Bachelor Thesis\BT folder\Measurements\Evo 100\Daten Messung 1 Evo 100\Lätchwert Messung 1 def.xlsx'
         mc.Reference=9.5;
    
 def OfflineFileData(machineSpec): 
@@ -88,7 +87,7 @@ class OnlineTempData (Thread):
         print ("Ending T")
         
         
-class OnlineMachineData(Thread):
+class OnlineErrData(Thread):
     
     def __init__(mc, machineSpec):
         Thread.__init__(mc)
