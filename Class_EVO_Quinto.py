@@ -18,8 +18,8 @@ class EVO_Quinto:
         #mc.FilePathTemperature = r'C:\Users\' #TODO
 
         self.Reference=9.5;
-    def ConnectMachine(self):
-        self.OPC = OPCUAcon()
+    def ConnectMachine(self,measurementFrequency):
+        self.OPC = OPCUAcon(measurementFrequency)
     def OfflineFileData(self): 
         
         #loading from excel

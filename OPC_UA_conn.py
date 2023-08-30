@@ -1,6 +1,12 @@
 # OPCUA connection object
 import time
-class OPCUAcon(object):
+from threading import Thread, Event
+import sys
+import os, csv
+from pathlib import Path
+
+
+class OPCUAcon(Thread):
     """"Parameters
     ----------
     configuration_id: selects configuration from self.master_conf dictionary for Tuning:
@@ -10,132 +16,160 @@ class OPCUAcon(object):
     server_port: Port of the OPC UA server
     """
 
-    def __init__(self, machine_id=163, connection_id="192.168.1.3", server_port="4840"):
-        self.master_conf = {"5": {'sercosIP': '192.168.143.3,0,0',
-                                  'axis': 'GB',
-                                  'osc_param_1': '53', # S-0-0053
-                                  'osc_param_2' : '84', # S-0-0084
-                                  'osc_param_3' : '189', # S-0-0189
-                                  'osc_param_4' : '32816', # P-0-0048 (32768+48)
-                                  'nb_of_values': '8192', # Number of measurement values
+    def __init__(self,measurementFrequency, machine_id=163, connection_id="192.168.1.3", server_port="4840"):
+        Thread.__init__(self)
+        self.__flag = Event()  # The flag used to pause the thread
+        self.__flag.set()  # Set to True
+        self.__running = Event()  # Used to stop the thread identification
+        self.__running.set()  # Set running to True
+        self.argv = sys.argv
+        self.exectutable = sys.executable
+
+        self.master_conf = {"0": {'sercosIP': '192.168.143.12,0,0', #access for example by list(master_conf.values())[0]["sercosIP"]
+                                  'axis_name': 'GA',#TODO Check all names
+                                  },
+                            "1": {'sercosIP': '192.168.143.9,0,0',
+                                  'axis_name': 'GS1',
+                                  },
+                            "2": {'sercosIP': '192.168.143.9,1,0',
+                                  'axis_name': 'GS1_2',
+                                  },
+                            "3": {'sercosIP': '192.168.143.10,0,0',
+                                  'axis': 'GS2',
+                                  },
+                            "4": {'sercosIP': '192.168.143.10,1,0',
+                                  'axis': 'GS2_2',
+                                  },
+                            "5": {'sercosIP': '192.168.143.1,0,0',
+                                  'axis': 'GSX',
                                   },
                             "6": {'sercosIP': '192.168.143.1,1,0',
-                                  'axis': 'GC',
-                                  'osc_param_1': '51', # S-0-0051
-                                  'osc_param_2' : '84', # S-0-0084
-                                  'osc_param_3' : '189', # S-0-0189
-                                  'osc_param_4' : '32816', # P-0-0048 (32768+48)
-                                  'nb_of_values': '8192',
-                                 },
-                            "7": {'sercosIP': '192.168.143.1,0,0',
-                                  'axis': 'GX',
-                                  'osc_param_1': '51', # S-0-0051
-                                  'osc_param_2' : '84', # S-0-0084
-                                  'osc_param_3' : '189', # S-0-0189
-                                  'osc_param_4' : '32816', # P-0-0048 (32768+48)
-                                  },
-                            "8": {'sercosIP': '192.168.143.9,1,0',
-                                  'axis': 'GY',
-                                  'osc_param_1': '51', # S-0-0051
-                                  'osc_param_2' : '84', # S-0-0084
-                                  'osc_param_3' : '189', # S-0-0189
-                                  'osc_param_4' : '32816', # P-0-0048 (32768+48)
-                                  },
-                            "99": {'sercosIP': '192.168.143.4,0,0',
-                                   'axis': 'GC',
-                                   'osc_param_1': '51', # S-0-0051
-                                   'osc_param_2' : '84', # S-0-0084
-                                   'osc_param_3' : '189', # S-0-0189
-                                   'osc_param_4' : '32816', # P-0-0048 (32768+48)
+                                  'axis': 'GSX_2',
                                   },
                             }
-        self.configuration_id = [5,6,7,8]
+        self.OPCNames = ['Channel 1','Channel 2','Channel 3','Channel 4','Channel 5','Channel 6','Channel 7','Channel 8'] #TODO Adapt to actual measurements
+
         self.machine_id = machine_id
         self.connection_id = connection_id
         self.server_port = server_port
+        self.measurementFrequency = measurementFrequency #Measurement frequency in seconds for drives and other recorded values TODO smarter than sleep duration
         self.timestamp_initialization = time.time()
         self.connection = None # OPC UA connection
         self.config = None
         self.con_ready = False # Flag determines if connection works and conditions, that have to be set manually by the operator are ok
         self.set_ready = False # Flag determines if configuration parameters are set
-        self.get_config() # sets the internal parameters w.r.t. the configuration id
-        # Master configuration, if new configuration is added, make sure to define all parameters
+        self.ObserveTouchProbe = False #Flag determines if touch probe WMES observation is active TODO
+
+        self.Measurment = []
+
+        self.SaveasCSV = True
+        self.SaveasInflux = False
+        self.PrintMeasurements = True
+        self.log_file_name = "TestLog.csv"
+
+        self.argv = sys.argv
+        self.executable = sys.executable
+
+        self.init_logFile()  # Create a csv if it doesn't exist
+
+
+    def pause(self):
+        self.__flag.clear()  # Set to False to block the thread
+
+    def resume(self):
+        self.__flag.set()  # Set to True, let the thread stop blocking
+
+    def stop(self):
+        self.__flag.set()  # Resume the thread from the suspended state, if it is already suspended
+        self.__running.clear()  # Set to False
+
+    def init_logFile(self):
+        # Create the csv file for the rtd temperatures if it doesn't exist
+        if self.SaveasCSV:
+            if not (Path(os.getcwd()) / self.log_file_name).is_file():
+                with open(self.log_file_name, 'w', newline='') as csvfile:
+                    writer = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+                    writer.writerow(['Date/Time'] + self.OPCNames)
+
+
+    def Listener(self):
+        #Records measurements and saves them TODO
+        1*1
+
     def ReadAxis(self):
         # Connection to OPC Server
-        self.connection = Client('opc.tcp://' + self.connection_id + ':' + self.server_port)
-        self.connection.connect()
-        self.DriveTemp=self.connection.get_node('ns=7;s="SercosIP,' + self.config['sercosIP'] +'".ParameterSet."' + 'P-0-0028' + '"')
-    def get_config(self):
-        """Selects the configuration w.r.t the axis given to the object, if an addition configuration is created
-        for autotuning (e.g. additional axis, different speed for tuning), it can be added here"""
-        try:
-            self.config = self.master_conf[self.configuration_id]
-            self.d_min = self.config['d_min'].copy()
-            self.d_max = self.config['d_max'].copy()
-            self.opt_dim = self.d_min.shape[0]
-            self.Ti = self.config['T_i']
-            self.w = self.config['w'].copy()
-            self.w_con = self.config['w_con'].copy()
-            self.constrlim = self.config['constr_lim']
-            self.critlim = self.config['crit_lim']
-            self.faclim = self.config['fac_lim']
-            self.iterinit = self.config['iter_init']
-            self.iterlim = self.config['iter_lim']
-            self.stop_eic_abs = self.config['stop_eic_abs']
-            self.x_nom = self.config['x_nom'].copy()
-            self.crit_step = self.config['crit_step'].copy()
-        except:
-            self.config = None
-            print("No configuration ",self.configuration_id, " found or configuration incomplete")
+        #self.connection = Client('opc.tcp://' + self.connection_id + ':' + self.server_port)
+        #self.connection.connect()
+
+        #Read Drive Temperatures: list(master_conf.values())[0]["sercosIP"]
+        for drive in range(len(self.master_conf)):
+            self.DriveTemp[drive]=self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive]["sercosIP"] +'".ParameterSet."' + 'S-0-0383' + '"')
+        # self.DrivePower[drive]= #Zwischenkreisleistung TODO Check parameter to read
+
+        #GSX SercosIP,192.168.143.1,1,0”ParameterSet.“S-0-0383” (INT 16)
+        #Zwischenkreisleistung
+        #GA SercosIP,192.168.143.12,0,0”ParameterSet.“S-0-0383” (INT 16)
+
+
+        return self.DriveTemp,self.DrivePower
+    def MonitorTouchProbe(self):
+        #TODO always active once called (Shutoff required?)
+        # Monitor changes in touch probe and when registered record wmes value and assign it to the correct measurement step
+        #TODO Adapt measurements depending on setable/callable measurement cycle --> Error calculation
+        1*1
+
+    def writeData(self, t):
+        if self.SaveasCSV:
+            try:
+                # Write the rtd temperatures
+                with open(self.log_file_name, 'a', newline='') as csvfile:
+                    writer = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+                    writer.writerows(t)
+            except:
+                print('Please, make sure that all .csv files are closed')
+
+        if self.SaveasInflux:
+            try:
+                Influx.influx_export(t, self.ServerInflux)
+            except:
+                print("Fail Write to influx, check internet connectivity")
+                raise Exception('influx')
     def init_connection(self):
         """Initializes the connection with the OPC UA server and sets the corresponding
         nodes w.r.t the parameter self.config, this has to be called first before auto-tuning can be started"""
-        if self.config is None:
-            print("No configuration selected")
-        else:
-            # Set the client url
+        # Set the client url
+        try:
             self.connection = Client('opc.tcp://' + self.connection_id + ':' + self.server_port)
-            self.check_conditions()
+            self.connection.connect()
+            print("Successfully initialized connection to OPC Server")
+            self.set_ready = True
+            #ToDo Test connection by reading every variable required? Potentially in different try
+        except:
+            print('Connection failed. Attempted to connect to client: ','opc.tcp://' + self.connection_id + ':' + self.server_port)
 
-            try:
-                # initialize axis
-                print("axis to be measured is ",self.config['axis'])
-                self.set_ready = True
+    def run(self):
 
-                # Trigger-Signal set
-                trigger_sig = self.connection.get_node('ns=7;s="SercosIP,' + self.config['sercosIP'] +'".ParameterSet."P-0-0026"')
-                trigger_sig.set_value(int(self.config['trigger_sig_set']))
-                if trigger_sig.get_value() >= 32768:
-                    print('Trigger signal is set to: P-' + str(trigger_sig.get_value()-32768))
-                else:
-                    print('Trigger signal is set to: S-' + str(trigger_sig.get_value()))
-                if trigger_sig.get_value() != int(self.config['trigger_sig_set']):
-                    self.set_ready = False
-
-                # Trigger-Value set
-                trigger_tresh = self.connection.get_node('ns=7;s="SercosIP,' + self.config['sercosIP'] +'".ParameterSet."P-0-0027"')
-                trigger_tresh.set_value(int(int(self.config['trigger_tresh_set'])*1000)) # time 1000, since extension by 4 digits
-                print('Trigger Treshold set to: ' + str(trigger_tresh.get_value()/1000))
-                if trigger_tresh.get_value()/1000 != int(self.config['trigger_tresh_set']):
-                    self.set_ready = False
-
-                # Set the parameters for each of the 4 Oscilloscopes to be monitored.
-                # Oscilloscope parameter sets are: P-0-0023, P-0-0024, P-0-0147, P-0-0148
-                # Oscilloscope lists with the measured values are: P-0-0021, P-0-0022, P-0-0145, P-0-0146
-                osc1 = self.connection.get_node('ns=7;s="SercosIP,' + self.config['sercosIP'] +'".ParameterSet."' + 'P-0-0023' + '"')
-                osc2 = self.connection.get_node('ns=7;s="SercosIP,' + self.config['sercosIP'] +'".ParameterSet."' + 'P-0-0024' + '"')
-                osc3 = self.connection.get_node('ns=7;s="SercosIP,' + self.config['sercosIP'] +'".ParameterSet."' + 'P-0-0147' + '"')
-                osc4 = self.connection.get_node('ns=7;s="SercosIP,' + self.config['sercosIP'] +'".ParameterSet."' + 'P-0-0148' + '"')
-                osc1parval = int(self.config['osc_param_1'])
-                osc2parval = int(self.config['osc_param_2'])
-                osc3parval = int(self.config['osc_param_3'])
-                osc4parval = int(self.config['osc_param_4'])
-                osc1.set_value(osc1parval, ua.VariantType.Int32)
-                osc2.set_value(osc2parval, ua.VariantType.Int32)
-                osc3.set_value(osc3parval, ua.VariantType.Int32)
-                osc4.set_value(osc4parval, ua.VariantType.Int32)
-
-            except:
-                self.con_ready = False
-                self.connection.disconnect()
-                print('Could not set one or multiple params - no connection?')
+        try:
+            print("Starting OPC Recording")
+            while self.__running.isSet():
+                self.__flag.wait()  # Return immediately when it is True, block until the internal flag is True when it is False
+                currentTime = datetime.datetime.now()
+                # Read the values
+                if currentTime >= self.previousTime + datetime.timedelta(0, self.measurement_frequency):
+                    t = self.ReadAxis()  # Read temperatures
+                    self.Measurment.append(
+                        [currentTime.strftime("%d.%m.%Y %H:%M:%S.%f")] + t)  # Concatenate time and temperature information
+                    if self.PrintMeasurements:
+                        print(self.Measurment[-1])
+                    # plt.plot(self.rtdTemperatures[0:len(self.rtdTemperatures)-1])
+                    # plt.show()
+                    self.writeData(t)  # Save to .csv or setting specific location
+                    self.previousTime = datetime.datetime.now()
+                # Reset previousTime
+            self.error = 0
+        # return error_detection
+        except:
+            print('Error raised while loading or exporting data')
+            self.error = 1
+            print("restarting")
+            os.execv(self.executable, ["python"] + self.argv)

@@ -1,6 +1,6 @@
 class MT:
         
-    def __init__(self, Name, mode):
+    def __init__(self, Name, mode,measurementFrequency):
         #Import Machine specific package depending on which machine is used
         if Name == "EVO_Quinto":
             from Class_EVO_Quinto import EVO_Quinto
@@ -23,7 +23,8 @@ class MT:
         elif mode == "Compensation" or mode == "Log":
             self.ThermalError = ()
             self.Temperature  = ()
-            self.Machine.ConnectMachine()
+            self.Machine.ConnectMachine(measurementFrequency)
+            self.Machine.OPC.start()
         else:
             raise SystemExit('Error: Unknown Machine Mode, currently implemented "Sim", "Compensation" or "Log".')
 

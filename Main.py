@@ -11,10 +11,12 @@ from Machine_General import MT
 
 MachineName = "EVO_Quinto"                   #machine name
 mode        = "Log"                   #set mode we are working with, either Sim or Compensation, or Log? TODO Log is supposed to be Online but without writing
+measurementFrequency=5 #Measurement frequency in seconds for drives and other recorded values
+# TODO? Move all to settings variable
 
-#Data Loading       
+#Data Loading
         
-MT = MT(MachineName, mode)
+MT = MT(MachineName, mode,measurementFrequency)
 del MachineName, mode                     #deleting useless variable
 
 #machineSpec=load_DataMachine.specs()     #acess to all machine data from Machine method
