@@ -1,9 +1,11 @@
 # OPCUA connection object
-import time
+import time, datetime
 from threading import Thread, Event
 import sys
 import os, csv
 from pathlib import Path
+from opcua import Client
+from opcua import ua
 
 
 class OPCUAcon(Thread):
@@ -16,7 +18,7 @@ class OPCUAcon(Thread):
     server_port: Port of the OPC UA server
     """
 
-    def __init__(self,measurementFrequency, machine_id=163, connection_id="192.168.1.3", server_port="4840"):
+    def __init__(self,measurementFrequency, machine_id=163, connection_id="192.168.250.3", server_port="4840"):
         Thread.__init__(self)
         self.__flag = Event()  # The flag used to pause the thread
         self.__flag.set()  # Set to True
@@ -53,14 +55,17 @@ class OPCUAcon(Thread):
         self.connection_id = connection_id
         self.server_port = server_port
         self.measurementFrequency = measurementFrequency #Measurement frequency in seconds for drives and other recorded values TODO smarter than sleep duration
-        self.timestamp_initialization = time.time()
+        self.timestamp_initialization = datetime.datetime.now()
+        self.previousTime    = datetime.datetime.combine(datetime.date.min, datetime.time.min)
+
         self.connection = None # OPC UA connection
         self.config = None
         self.con_ready = False # Flag determines if connection works and conditions, that have to be set manually by the operator are ok
         self.set_ready = False # Flag determines if configuration parameters are set
         self.ObserveTouchProbe = False #Flag determines if touch probe WMES observation is active TODO
 
-        self.Measurment = []
+        self.Measurement = []
+        self.DriveTemp = []
 
         self.SaveasCSV = True
         self.SaveasInflux = False
@@ -103,7 +108,10 @@ class OPCUAcon(Thread):
 
         #Read Drive Temperatures: list(master_conf.values())[0]["sercosIP"]
         for drive in range(len(self.master_conf)):
-            self.DriveTemp[drive]=self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive]["sercosIP"] +'".ParameterSet."' + 'S-0-0383' + '"')
+            node=self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive]["sercosIP"] +'".ParameterSet."' + 'S-0-0383' + '"' + '.DisplayValue')
+            self.DriveTemp[drive]=self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive]["sercosIP"] +'".ParameterSet."' + 'S-0-0383' + '"').get_value()
+            self.DriveTemp[drive]=self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive]["sercosIP"] +'".ParameterSet."' + 'S-0-0383' + '"' + '.DisplayValue')
+
         # self.DrivePower[drive]= #Zwischenkreisleistung TODO Check parameter to read
 
         #GSX SercosIP,192.168.143.1,1,0”ParameterSet.“S-0-0383” (INT 16)
@@ -135,8 +143,7 @@ class OPCUAcon(Thread):
                 print("Fail Write to influx, check internet connectivity")
                 raise Exception('influx')
     def init_connection(self):
-        """Initializes the connection with the OPC UA server and sets the corresponding
-        nodes w.r.t the parameter self.config, this has to be called first before auto-tuning can be started"""
+        """Initializes the connection with the OPC UA server, this has to be called first before measurements can be started"""
         # Set the client url
         try:
             self.connection = Client('opc.tcp://' + self.connection_id + ':' + self.server_port)
@@ -150,17 +157,18 @@ class OPCUAcon(Thread):
     def run(self):
 
         try:
+            self.init_connection()
             print("Starting OPC Recording")
             while self.__running.isSet():
                 self.__flag.wait()  # Return immediately when it is True, block until the internal flag is True when it is False
                 currentTime = datetime.datetime.now()
                 # Read the values
-                if currentTime >= self.previousTime + datetime.timedelta(0, self.measurement_frequency):
+                if currentTime >= self.previousTime + datetime.timedelta(0, self.measurementFrequency):
                     t = self.ReadAxis()  # Read temperatures
-                    self.Measurment.append(
+                    self.Measurement.append(
                         [currentTime.strftime("%d.%m.%Y %H:%M:%S.%f")] + t)  # Concatenate time and temperature information
                     if self.PrintMeasurements:
-                        print(self.Measurment[-1])
+                        print(self.Measurement[-1])
                     # plt.plot(self.rtdTemperatures[0:len(self.rtdTemperatures)-1])
                     # plt.show()
                     self.writeData(t)  # Save to .csv or setting specific location
