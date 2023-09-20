@@ -35,5 +35,6 @@ class MT:
         self.Temperature  = Temperature
             
 
-
+    def WriteCompensationToMachine(self):
+        #TODO IP input overwrite
 

@@ -50,6 +50,7 @@ class OPCUAcon(Thread):
                                   },
                             }
         self.OPCNames = ['Channel 1','Channel 2','Channel 3','Channel 4','Channel 5','Channel 6','Channel 7','Channel 8'] #TODO Adapt to actual measurements
+        self.nodes = []
 
         self.machine_id = machine_id
         self.connection_id = connection_id
@@ -66,6 +67,7 @@ class OPCUAcon(Thread):
 
         self.Measurement = []
         self.DriveTemp = []
+        self.DrivePower = []
 
         self.SaveasCSV = True
         self.SaveasInflux = False
@@ -107,19 +109,20 @@ class OPCUAcon(Thread):
         #self.connection.connect()
 
         #Read Drive Temperatures: list(master_conf.values())[0]["sercosIP"]
-        for drive in range(len(self.master_conf)):
-            node=self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive]["sercosIP"] +'".ParameterSet."' + 'S-0-0383' + '"' + '.DisplayValue')
-            self.DriveTemp[drive]=self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive]["sercosIP"] +'".ParameterSet."' + 'S-0-0383' + '"').get_value()
-            self.DriveTemp[drive]=self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive]["sercosIP"] +'".ParameterSet."' + 'S-0-0383' + '"' + '.DisplayValue')
+    #    for drive in range(len(self.master_conf)):
+    #        node=self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive]["sercosIP"] +'".ParameterSet."' + 'S-0-0383' + '"' + '.DisplayValue')
+    #        self.DriveTemp[drive]=self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive]["sercosIP"] +'".ParameterSet."' + 'S-0-0383' + '"').get_value()
+    #        self.DriveTemp[drive]=self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive]["sercosIP"] +'".ParameterSet."' + 'S-0-0383' + '"' + '.DisplayValue')
 
         # self.DrivePower[drive]= #Zwischenkreisleistung TODO Check parameter to read
 
         #GSX SercosIP,192.168.143.1,1,0”ParameterSet.“S-0-0383” (INT 16)
         #Zwischenkreisleistung
         #GA SercosIP,192.168.143.12,0,0”ParameterSet.“S-0-0383” (INT 16)
+        for drive in range(len(self.node)):
+            self.DriveTemp[drive] = self.node[drive].get_value()
 
-
-        return self.DriveTemp,self.DrivePower
+        return self.DriveTemp
     def MonitorTouchProbe(self):
         #TODO always active once called (Shutoff required?)
         # Monitor changes in touch probe and when registered record wmes value and assign it to the correct measurement step
@@ -153,6 +156,23 @@ class OPCUAcon(Thread):
             #ToDo Test connection by reading every variable required? Potentially in different try
         except:
             print('Connection failed. Attempted to connect to client: ','opc.tcp://' + self.connection_id + ':' + self.server_port)
+        #Connect nodes for drive temperatures to self, later reads all values from self.node in ReadAxis and subsequent logging operations
+        for drive in range(len(self.master_conf)):
+            try:
+                    self.node[drive] = self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive][
+                        "sercosIP"] + '".ParameterSet."' + 'S-0-0383' + '"')
+            except:
+                print('Failed to connect to Drive. Ensure they are active and the adress correct. Tried connecting to: '
+                    +'ns=7;s="SercosIP,' + list(self.master_conf.values())[drive][
+                    "sercosIP"] + '".ParameterSet."' + 'S-0-0383' + '"')
+        for drive in range(len(self.master_conf)):
+            try: #Add +1 to self.node len? TODO CHECK
+                    self.node[len(self.node)] = self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive][
+                        "sercosIP"] + '".ParameterSet."' + 'S-0-0383' + '"')    #TODO Adapt parameter set to Zwischenkreisleistung and others
+            except:
+                print('Failed to connect to Drive. Ensure they are active and the adress correct. Tried connecting to: '
+                    +'ns=7;s="SercosIP,' + list(self.master_conf.values())[drive][
+                    "sercosIP"] + '".ParameterSet."' + 'S-0-0383' + '"')
 
     def run(self):
 
