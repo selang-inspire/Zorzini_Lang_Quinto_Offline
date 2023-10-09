@@ -1,5 +1,7 @@
 # OPCUA connection object
 import time, datetime
+import numpy as np
+import pandas as pd
 from threading import Thread, Event
 import sys
 import os, csv
@@ -50,7 +52,7 @@ class OPCUAcon(Thread):
                                   },
                             }
         self.OPCNames = ['Channel 1','Channel 2','Channel 3','Channel 4','Channel 5','Channel 6','Channel 7','Channel 8'] #TODO Adapt to actual measurements
-        self.nodes = []
+        self.node = []
 
         self.machine_id = machine_id
         self.connection_id = connection_id
@@ -66,13 +68,14 @@ class OPCUAcon(Thread):
         self.ObserveTouchProbe = False #Flag determines if touch probe WMES observation is active TODO
 
         self.Measurement = []
-        self.DriveTemp = []
-        self.DrivePower = []
+        self.DriveTemp = np.empty(7)
+        self.DrivePower = np.empty(7)
+        self.DriveEnergy = np.empty(7)
 
         self.SaveasCSV = True
         self.SaveasInflux = False
         self.PrintMeasurements = True
-        self.log_file_name = "TestLog.csv"
+        self.log_file_name = "C:\\Users\\Admin.AGATHON-7OEU3S8\\Desktop\\MainThermokompensation\\Messdaten\\Log_AP_26_09_2023.csv"
 
         self.argv = sys.argv
         self.executable = sys.executable
@@ -104,25 +107,17 @@ class OPCUAcon(Thread):
         1*1
 
     def ReadAxis(self):
-        # Connection to OPC Server
-        #self.connection = Client('opc.tcp://' + self.connection_id + ':' + self.server_port)
-        #self.connection.connect()
-
-        #Read Drive Temperatures: list(master_conf.values())[0]["sercosIP"]
-    #    for drive in range(len(self.master_conf)):
-    #        node=self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive]["sercosIP"] +'".ParameterSet."' + 'S-0-0383' + '"' + '.DisplayValue')
-    #        self.DriveTemp[drive]=self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive]["sercosIP"] +'".ParameterSet."' + 'S-0-0383' + '"').get_value()
-    #        self.DriveTemp[drive]=self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive]["sercosIP"] +'".ParameterSet."' + 'S-0-0383' + '"' + '.DisplayValue')
-
-        # self.DrivePower[drive]= #Zwischenkreisleistung TODO Check parameter to read
-
-        #GSX SercosIP,192.168.143.1,1,0”ParameterSet.“S-0-0383” (INT 16)
+        #GSX SercosIP,192.168.143.1,1,0”ParameterSet.“S-0-0383” (INT 16)  "SercosIP,192.168.143.12,0,0".ParameterSet."S-0-0383"
         #Zwischenkreisleistung
-        #GA SercosIP,192.168.143.12,0,0”ParameterSet.“S-0-0383” (INT 16)
-        for drive in range(len(self.node)):
-            self.DriveTemp[drive] = self.node[drive].get_value()
+        #GA SercosIP,192.168.143.12,0,0”ParameterSet.“S-0-0382” (INT 16)
+        for drive in range(int(len(self.node)/3)): #Careful hardcoded difference between drive temp and power (Zwischenkreisleistung), has to be adapted if extended
+            self.DriveTemp[drive] = self.node[drive].get_value() 
+        for drive in range(int(len(self.node)/3)):
+            self.DrivePower[drive] = self.node[drive+7].get_value()
+        for drive in range(int(len(self.node)/3)):
+            self.DrivePower[drive] = self.node[drive+14].get_value()
 
-        return self.DriveTemp
+        #return self.DriveTemp probably not necessary as part of self?
     def MonitorTouchProbe(self):
         #TODO always active once called (Shutoff required?)
         # Monitor changes in touch probe and when registered record wmes value and assign it to the correct measurement step
@@ -159,20 +154,31 @@ class OPCUAcon(Thread):
         #Connect nodes for drive temperatures to self, later reads all values from self.node in ReadAxis and subsequent logging operations
         for drive in range(len(self.master_conf)):
             try:
-                    self.node[drive] = self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive][
-                        "sercosIP"] + '".ParameterSet."' + 'S-0-0383' + '"')
+                    self.node.append(self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive][
+                        "sercosIP"] + '".ParameterSet."' + 'S-0-0383' + '"'))
             except:
                 print('Failed to connect to Drive. Ensure they are active and the adress correct. Tried connecting to: '
                     +'ns=7;s="SercosIP,' + list(self.master_conf.values())[drive][
                     "sercosIP"] + '".ParameterSet."' + 'S-0-0383' + '"')
+                raise #TODO Ensure that entire communication is restarted
         for drive in range(len(self.master_conf)):
             try: #Add +1 to self.node len? TODO CHECK
-                    self.node[len(self.node)] = self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive][
-                        "sercosIP"] + '".ParameterSet."' + 'S-0-0383' + '"')    #TODO Adapt parameter set to Zwischenkreisleistung and others
+                    self.node.append(self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive][
+                        "sercosIP"] + '".ParameterSet."' + 'S-0-0382' + '"'))    #Parameter set to Zwischenkreisleistung TODO check other interesting parameters?
             except:
                 print('Failed to connect to Drive. Ensure they are active and the adress correct. Tried connecting to: '
                     +'ns=7;s="SercosIP,' + list(self.master_conf.values())[drive][
-                    "sercosIP"] + '".ParameterSet."' + 'S-0-0383' + '"')
+                    "sercosIP"] + '".ParameterSet."' + 'S-0-0382' + '"')
+                raise
+        for drive in range(len(self.master_conf)):
+            try: #Add +1 to self.node len? TODO CHECK
+                    self.node.append(self.connection.get_node('ns=7;s="SercosIP,' + list(self.master_conf.values())[drive][
+                        "sercosIP"] + '".ParameterSet."' + 'P-0-0851' + '"'))    #Parameter set to Zwischenkreisleistung TODO check other interesting parameters?
+            except:
+                print('Failed to connect to Drive. Ensure they are active and the adress correct. Tried connecting to: '
+                    +'ns=7;s="SercosIP,' + list(self.master_conf.values())[drive][
+                    "sercosIP"] + '".ParameterSet."' + 'P-0-0851' + '"')
+                raise
 
     def run(self):
 
@@ -184,14 +190,13 @@ class OPCUAcon(Thread):
                 currentTime = datetime.datetime.now()
                 # Read the values
                 if currentTime >= self.previousTime + datetime.timedelta(0, self.measurementFrequency):
-                    t = self.ReadAxis()  # Read temperatures
-                    self.Measurement.append(
-                        [currentTime.strftime("%d.%m.%Y %H:%M:%S.%f")] + t)  # Concatenate time and temperature information
+                    self.ReadAxis()  # Read temperatures
+                    self.Measurement.append([[currentTime.strftime("%d.%m.%Y %H:%M:%S.%f")], self.DriveTemp, self.DrivePower,self.DriveEnergy])  # Concatenate time and temperature information
                     if self.PrintMeasurements:
                         print(self.Measurement[-1])
                     # plt.plot(self.rtdTemperatures[0:len(self.rtdTemperatures)-1])
                     # plt.show()
-                    self.writeData(t)  # Save to .csv or setting specific location
+                    self.writeData(self.Measurement[-1])  # Save to .csv or setting specific location
                     self.previousTime = datetime.datetime.now()
                 # Reset previousTime
             self.error = 0
@@ -200,4 +205,4 @@ class OPCUAcon(Thread):
             print('Error raised while loading or exporting data')
             self.error = 1
             print("restarting")
-            os.execv(self.executable, ["python"] + self.argv)
+            os.execv(self.executable, ["python"] + self.argv) #TODO Ensure restart here!!!

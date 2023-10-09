@@ -11,7 +11,8 @@ from Machine_General import MT
 
 MachineName = "EVO_Quinto"                   #machine name
 mode        = "Log"                   #set mode we are working with, either Sim or Compensation, or Log? TODO Log is supposed to be Online but without writing
-measurementFrequency=5 #Measurement frequency in seconds for drives and other recorded values
+measurementFrequency=1 #Measurement frequency in seconds for drives and other recorded values
+Logfrequency=30 #TODO Log only at logfrequency, measure and aggregate average/filter? at measurementFrequency currently not implemented
 # TODO? Move all to settings variable
 
 #Data Loading

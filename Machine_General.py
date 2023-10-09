@@ -37,4 +37,5 @@ class MT:
 
     def WriteCompensationToMachine(self):
         #TODO IP input overwrite
-
+        test=1+1
+        
