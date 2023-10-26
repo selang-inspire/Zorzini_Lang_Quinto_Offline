@@ -30,26 +30,42 @@ class OPCUAcon(Thread):
         self.exectutable = sys.executable
 
         self.master_conf = {"0": {'sercosIP': '192.168.143.12,0,0', #access for example by list(master_conf.values())[0]["sercosIP"]
-                                  'axis_name': 'GA',#TODO Check all names
+                                  'axis_name': 'GA',#TODO Check all names G A verified
                                   },
-                            "1": {'sercosIP': '192.168.143.9,0,0',
+                            "1": {'sercosIP': '192.168.143.9,0,0', #G S Drive (Schleifspindel)
                                   'axis_name': 'GS1',
                                   },
-                            "2": {'sercosIP': '192.168.143.9,1,0',
+                            "2": {'sercosIP': '192.168.143.9,1,0', #G Y Drive 
                                   'axis_name': 'GS1_2',
                                   },
-                            "3": {'sercosIP': '192.168.143.10,0,0',
+                            "3": {'sercosIP': '192.168.143.10,0,0', #G S 2 Abrichtspindel 
                                   'axis': 'GS2',
                                   },
-                            "4": {'sercosIP': '192.168.143.10,1,0',
-                                  'axis': 'GS2_2',
+                            "4": {'sercosIP': '192.168.143.10,1,0', # TODO something wrong, this should be G B but it is not
+                                  'axis': 'GB',
                                   },
-                            "5": {'sercosIP': '192.168.143.1,0,0',
-                                  'axis': 'GSX',
+                            "5": {'sercosIP': '192.168.143.1,0,0',#G X not usable only switch behaviour usually 2°C
+                                  'axis': 'GX',
                                   },
-                            "6": {'sercosIP': '192.168.143.1,1,0',
-                                  'axis': 'GSX_2',
+                            "6": {'sercosIP': '192.168.143.1,1,0',# TODO Should be G_C is not e.g. 25 instead of 2°C
+                                  'axis': 'GC',
                                   },
+                            "7": {'sercosIP': '192.168.143.15,0,0',# MB C r probalby C 2 achse
+                                  'axis': 'GC_r',
+                                  },
+                            "8": {'sercosIP': '192.168.143.20,0,0',# G X probably bette X value
+                                  'axis': 'GX_evo',
+                                  },
+                            "9": {'sercosIP': '192.168.143.21,0,0',# G Z evo location unknown, maybe lift for pallette Rohlinge?
+                                  'axis': 'GZ_evo',
+                                  },
+                            "10": {'sercosIP': '192.168.143.22,0,0',# G U probably location of cleaning wheel in X?
+                                  'axis': 'GU',
+                                  },
+                            "11": {'sercosIP': '192.168.143.22,1,0',# G U spindel TODO Verify adress
+                                  'axis': 'GU_S',
+                                  },
+
                             }
         self.OPCNames = ['Channel 1','Channel 2','Channel 3','Channel 4','Channel 5','Channel 6','Channel 7','Channel 8'] #TODO Adapt to actual measurements
         self.node = []
@@ -68,14 +84,14 @@ class OPCUAcon(Thread):
         self.ObserveTouchProbe = False #Flag determines if touch probe WMES observation is active TODO
 
         self.Measurement = []
-        self.DriveTemp = np.empty(7)
-        self.DrivePower = np.empty(7)
-        self.DriveEnergy = np.empty(7)
+        self.DriveTemp = np.empty(len(self.master_conf))
+        self.DrivePower = np.empty(len(self.master_conf))
+        self.DriveEnergy = np.empty(len(self.master_conf))
 
         self.SaveasCSV = True
         self.SaveasInflux = False
         self.PrintMeasurements = True
-        self.log_file_name = "C:\\Users\\Admin.AGATHON-7OEU3S8\\Desktop\\MainThermokompensation\\Messdaten\\Log_CMK_09_10_2023.csv" #TODO Move to main file and use nice folder structure
+        self.log_file_name = "C:\\Users\\Admin.AGATHON-7OEU3S8\\Desktop\\MainThermokompensation\\Messdaten\\Log_AP_26_10_2023.csv" #TODO Move to main file and use nice folder structure
 
         self.argv = sys.argv
         self.executable = sys.executable
@@ -113,9 +129,9 @@ class OPCUAcon(Thread):
         for drive in range(int(len(self.node)/3)): #Careful hardcoded difference between drive temp and power (Zwischenkreisleistung), has to be adapted if extended
             self.DriveTemp[drive] = self.node[drive].get_value() 
         for drive in range(int(len(self.node)/3)):
-            self.DrivePower[drive] = self.node[drive+7].get_value()
+            self.DrivePower[drive] = self.node[drive+int(len(self.node)/3)].get_value()
         for drive in range(int(len(self.node)/3)):
-            self.DrivePower[drive] = self.node[drive+14].get_value()
+            self.DriveEnergy[drive] = self.node[drive+int(len(self.node)/3*2)].get_value()
 
         #return self.DriveTemp probably not necessary as part of self?
     def MonitorTouchProbe(self):
