@@ -20,7 +20,7 @@ class OPCUAcon(Thread):
     server_port: Port of the OPC UA server
     """
 
-    def __init__(self,measurementFrequency, machine_id=163, connection_id="192.168.250.3", server_port="4840"):
+    def __init__(self,measurementFrequency,log_file_name, machine_id=163, connection_id="192.168.250.3", server_port="4840"):
         Thread.__init__(self)
         self.__flag = Event()  # The flag used to pause the thread
         self.__flag.set()  # Set to True
@@ -67,7 +67,8 @@ class OPCUAcon(Thread):
                                   },
 
                             }
-        self.OPCNames = ['Channel 1','Channel 2','Channel 3','Channel 4','Channel 5','Channel 6','Channel 7','Channel 8'] #TODO Adapt to actual measurements
+        self.OPCNames = ['A-drive','S-drive (grinding)','Y-drive','S2-drive (dress)','B-drive (tocheck)','X-drive','C-drive (tocheck)',
+                         'C-drive rot (tocheck)','GX_evo','Z-drive (Pallette)','U-drive','US-drive'] #TODO Adapt to actual measurements
         self.node = []
 
         self.machine_id = machine_id
@@ -91,8 +92,7 @@ class OPCUAcon(Thread):
         self.SaveasCSV = True
         self.SaveasInflux = False
         self.PrintMeasurements = True
-        self.log_file_name = "C:\\Users\\Admin.AGATHON-7OEU3S8\\Desktop\\MainThermokompensation\\Messdaten\\Log_AP_26_10_2023.csv" #TODO Move to main file and use nice folder structure
-
+        self.log_file_name = log_file_name
         self.argv = sys.argv
         self.executable = sys.executable
 

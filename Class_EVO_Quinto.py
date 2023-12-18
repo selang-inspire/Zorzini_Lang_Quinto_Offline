@@ -8,18 +8,19 @@ from OPC_UA_conn import OPCUAcon
 #machine specific parameters
 class EVO_Quinto:
 
-    def __init__(self):
+    def __init__(self,log_file_name):
         self.SensorList = ['1 B WerkstückSpanner links','2 A_axis_Drive_Structure','3 C_axis_Top_Auf_Spindelstock_Mitte','4 C_Axis_Cover','5 Touch_Probe_Holder_Spindle',
                          '6 Spindle_Structure_Front','7 B drive gap between gear', '8 B WerkstückSpanner rechts','9 B Drive gearbox','10 Oil Backflow', '11 Env Machine Front',
                          '12 Air Workingspace', '13 Env Machine back middle', '14 X drive back down', '15 Bed behind machine left, axis enclosure',
                          '16 X structure cast right', '17 Drive grinding spindle','18 Spindle back left casting','19 X Drive middle top','20 bed below front',
                          '21 Air back','22 Coolant Backflow']
-        self.ErrorList = ['X0B'] #TODO Update to pivotes  
+        self.ErrorList = ['X0B'] #TODO Update to pivotes
+        self.log_file_name = log_file_name
         #mc.FilePathTemperature = r'C:\Users\' #TODO
 
         self.Reference=9.5;
     def ConnectMachine(self,measurementFrequency):
-        self.OPC = OPCUAcon(measurementFrequency)
+        self.OPC = OPCUAcon(measurementFrequency,self.log_file_name)
     def OfflineFileData(self): 
         
         #loading from excel
