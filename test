@@ -59,10 +59,10 @@ class OPCUAcon(Thread):
                             "9": {'sercosIP': '192.168.143.21,0,0',# G Z evo location unknown, maybe lift for pallette Rohlinge?
                                   'axis': 'GZ_evo',
                                   },
-                            "10": {'sercosIP': '192.168.143.22,0,0',# G U probably location of cleaning wheel in X?
+                            "9": {'sercosIP': '192.168.143.22,0,0',# G U probably location of cleaning wheel in X?
                                   'axis': 'GU',
                                   },
-                            "11": {'sercosIP': '192.168.143.22,1,0',# G U spindel TODO Verify adress
+                            "10": {'sercosIP': '192.168.143.23,0,0',# G U spindel TODO Verify adress
                                   'axis': 'GU_S',
                                   },
 
@@ -84,14 +84,14 @@ class OPCUAcon(Thread):
         self.ObserveTouchProbe = False #Flag determines if touch probe WMES observation is active TODO
 
         self.Measurement = []
-        self.DriveTemp = np.empty(len(self.master_conf))
-        self.DrivePower = np.empty(len(self.master_conf))
-        self.DriveEnergy = np.empty(len(self.master_conf))
+        self.DriveTemp = np.empty(7)
+        self.DrivePower = np.empty(7)
+        self.DriveEnergy = np.empty(7)
 
         self.SaveasCSV = True
         self.SaveasInflux = False
         self.PrintMeasurements = True
-        self.log_file_name = "C:\\Users\\Admin.AGATHON-7OEU3S8\\Desktop\\MainThermokompensation\\Messdaten\\TP_Log_12_12_2023.csv" #TODO Move to main file and use nice folder structure
+        self.log_file_name = "C:\\Users\\Admin.AGATHON-7OEU3S8\\Desktop\\MainThermokompensation\\Messdaten\\Log_CMK_09_10_2023.csv" #TODO Move to main file and use nice folder structure
 
         self.argv = sys.argv
         self.executable = sys.executable
@@ -131,7 +131,7 @@ class OPCUAcon(Thread):
         for drive in range(int(len(self.node)/3)):
             self.DrivePower[drive] = self.node[drive+int(len(self.node)/3)].get_value()
         for drive in range(int(len(self.node)/3)):
-            self.DriveEnergy[drive] = self.node[drive+int(len(self.node)/3*2)].get_value()
+            self.DrivePower[drive] = self.node[drive+int(len(self.node)/3*2)].get_value()
 
         #return self.DriveTemp probably not necessary as part of self?
     def MonitorTouchProbe(self):
