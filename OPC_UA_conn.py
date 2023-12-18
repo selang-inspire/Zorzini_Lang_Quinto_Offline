@@ -91,7 +91,7 @@ class OPCUAcon(Thread):
         self.SaveasCSV = True
         self.SaveasInflux = False
         self.PrintMeasurements = True
-        self.log_file_name = "C:\\Users\\Admin.AGATHON-7OEU3S8\\Desktop\\MainThermokompensation\\Messdaten\\Log_AP_26_10_2023.csv" #TODO Move to main file and use nice folder structure
+        self.log_file_name = "C:\\Users\\Admin.AGATHON-7OEU3S8\\Desktop\\MainThermokompensation\\Messdaten\\TP_Log_12_12_2023.csv" #TODO Move to main file and use nice folder structure
 
         self.argv = sys.argv
         self.executable = sys.executable
