@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 from threading import Thread
 
+#IMPORTANT: Currently The HMI has to be run as admin to allow the Compensation file sharing to work!
 
 #Parameters setting
 from Machine_General import MT
