@@ -2,6 +2,8 @@ import re
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+from threading import Thread
+
 class MT:
     def __init__(self, Name, mode,measurementFrequency,log_file_name):
         #Import Machine specific package depending on which machine is used
@@ -34,7 +36,8 @@ class MT:
             self.ThermalError = []
             self.Inputs = []
             self.Machine.ConnectMachine(measurementFrequency)
-            self.Machine.OPC.start()
+            thread = Thread(target = self.Machine.OPC.start(), daemon=True)
+            thread.start()
         else:
             raise SystemExit('Error: Unknown Machine Mode, currently implemented "Sim", "Compensation" or "Log".')
 
@@ -45,9 +48,12 @@ class MT:
 
         #Test Arbitrary prediction values:
         self.Prediction.loc[0,"Time"] = datetime.now()
-        self.Prediction.loc[0,"X Offset LR"] = 0.005
-        self.Prediction.loc[0,"Y Offset LR"] = 0.0075
-        self.Prediction.loc[0,"Z Offset LR"] = 0.0025
+        self.Prediction.loc[0,"X Offset LR"] = -0.050#15
+        self.Prediction.loc[0,"Y Offset LR"] = -0.0500#15
+        self.Prediction.loc[0,"Z Offset LR"] = -0.0500#15
+        self.Prediction.loc[0,"X Offset RR"] = -0.0500#15
+        self.Prediction.loc[0,"Y Offset RR"] = -0.0500#15
+        self.Prediction.loc[0,"Z Offset RR"] = -0.0500#15
 
         self.Compensation_To_Machine()
 
@@ -69,11 +75,18 @@ class MT:
                 name_value_pairs.append((name.strip(), value.strip()))
                 if name == "\nXOffsCorr4LR":
                     Xnr = len(name_value_pairs)-1
+                if name == "\nXOffsCorr4RR":
+                    Xnr_RR = len(name_value_pairs)-1
+
         locnr = len(self.IP_Comp_Values)
         self.IP_Comp_Values.loc[locnr,"Time"] = datetime.now()
-        self.IP_Comp_Values.loc[locnr,"X Offset LR"] = name_value_pairs[Xnr][1]        
-        self.IP_Comp_Values.loc[locnr,"Y Offset LR"] = name_value_pairs[Xnr+1][1]        
-        self.IP_Comp_Values.loc[locnr,"Z Offset LR"] = name_value_pairs[Xnr+2][1]        
+        self.IP_Comp_Values.loc[locnr,"X Offset LR"] = float(name_value_pairs[Xnr][1])        
+        self.IP_Comp_Values.loc[locnr,"Y Offset LR"] = float(name_value_pairs[Xnr+1][1])        
+        self.IP_Comp_Values.loc[locnr,"Z Offset LR"] = float(name_value_pairs[Xnr+2][1])        
+        self.IP_Comp_Values.loc[locnr,"X Offset RR"] = float(name_value_pairs[Xnr_RR][1])        
+        self.IP_Comp_Values.loc[locnr,"Y Offset RR"] = float(name_value_pairs[Xnr_RR+1][1])        
+        self.IP_Comp_Values.loc[locnr,"Z Offset RR"] = float(name_value_pairs[Xnr_RR+2][1])        
+
         #TODO Incorporate anvil pivot values that make sens
 
     def Write_Interpreter_Overwrite(self):
@@ -83,10 +96,13 @@ class MT:
         f.truncate(0)
         #Define ofsset to correct
         locnr = len(self.Prediction)-1
-        X =  "\nXOffsCorr4LR = " + str(self.Prediction.loc[locnr,"X Offset LR"]) + " ;" +"\n"
-        Y = "YOffsCorr4LR = " + str(self.Prediction.loc[locnr,"Y Offset LR"]) + " ;" +"\n"
-        Z = "ZOffsCorr4LR = " + str(self.Prediction.loc[locnr,"Z Offset LR"]) + " ;" +"\n" 
-        contents_new = X+Y+Z
+        X_LR =  "\nXOffsCorr4LR = " + str(self.Prediction.loc[locnr,"X Offset LR"]+self.IP_Comp_Values.loc[0,"X Offset LR"]) + " ;" +"\n"
+        X_RR =  "XOffsCorr4RR = " + str(self.Prediction.loc[locnr,"X Offset RR"]+self.IP_Comp_Values.loc[0,"X Offset RR"]) + " ;" +"\n"
+        Y_LR = "YOffsCorr4LR = " + str(self.Prediction.loc[locnr,"Y Offset LR"]+self.IP_Comp_Values.loc[0,"Y Offset LR"]) + " ;" +"\n"
+        Y_RR = "YOffsCorr4RR = " + str(self.Prediction.loc[locnr,"Y Offset RR"]+self.IP_Comp_Values.loc[0,"Y Offset RR"]) + " ;" +"\n"
+        Z_LR = "ZOffsCorr4LR = " + str(self.Prediction.loc[locnr,"Z Offset LR"]+self.IP_Comp_Values.loc[0,"Z Offset LR"]) + " ;" +"\n" 
+        Z_RR = "ZOffsCorr4RR = " + str(self.Prediction.loc[locnr,"Z Offset RR"]+self.IP_Comp_Values.loc[0,"Z Offset RR"]) + " ;" +"\n" 
+        contents_new = X_LR+Y_LR+Z_LR+X_RR+Y_RR+Z_RR
         #Write Compensation TxT
         f.write(contents_new)
         f.close()
