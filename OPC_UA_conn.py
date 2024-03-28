@@ -1,14 +1,17 @@
 # OPCUA connection object
 import time, datetime
+import sched
 import numpy as np
 import pandas as pd
 from threading import Thread, Event
 import sys
 import os, csv
+import pytz
 from pathlib import Path
 from opcua import Client
 from opcua import ua
-
+from influx_data_loading import influx_export
+from Class_Kinematic import errorMeasurement
 
 class OPCUAcon(Thread):
     """"Parameters
@@ -20,7 +23,7 @@ class OPCUAcon(Thread):
     server_port: Port of the OPC UA server
     """
 
-    def __init__(self,measurementFrequency,log_file_name, machine_id=163, connection_id="192.168.250.3", server_port="4840"):
+    def __init__(self,measurementFrequency,log_file_name,LogInfluxFrequency, machine_id=163, connection_id="192.168.250.3", server_port="4840"):
         Thread.__init__(self)
         self.__flag = Event()  # The flag used to pause the thread
         self.__flag.set()  # Set to True
@@ -65,18 +68,20 @@ class OPCUAcon(Thread):
                             "11": {'sercosIP': '192.168.143.22,1,0',# G U spindel TODO Verify adress
                                   'axis': 'GU_S',
                                   },
-
                             }
-        self.OPCNames = ['A-drive','S-drive (grinding)','Y-drive','S2-drive (dress)','B-drive (tocheck)','X-drive','C-drive (tocheck)',
-                         'C-drive rot (tocheck)','GX_evo','Z-drive (Pallette)','U-drive','US-drive'] #TODO Adapt to actual measurements
+        self.OPCNames = ['A-drive','S-drive (grinding)','Y-drive','S2-drive (dress)','B-drive','X-drive','C-drive',
+                         'C-drive rot','GX_evo','Z-drive (Pallette)','U-drive','US-drive'] #'A-drive','S-drive (grinding)','Y-drive','S2-drive (dress)','B-drive (tocheck)','X-drive','C-drive (tocheck)', 'C-drive rot (tocheck)','GX_evo','Z-drive (Pallette)','U-drive','US-drive'
+        self.MeasNames =  [axisname + " Temperature" for axisname in self.OPCNames] + [axisname + " Power" for axisname in self.OPCNames] + [axisname + " Energy" for axisname in self.OPCNames]
         self.node = []
 
         self.machine_id = machine_id
         self.connection_id = connection_id
         self.server_port = server_port
         self.measurementFrequency = measurementFrequency #Measurement frequency in seconds for drives and other recorded values TODO smarter than sleep duration
-        self.timestamp_initialization = datetime.datetime.now()
-        self.previousTime    = datetime.datetime.combine(datetime.date.min, datetime.time.min)
+        self.LogInfluxFrequency = LogInfluxFrequency #Log frequency in seconds for influxdb
+        self.timezone = pytz.timezone('Europe/Zurich') #Check if this is the right timezone for international use. Maybe from system time?
+        self.timestamp_initialization = datetime.datetime.now(self.timezone)
+        self.previousTime    = datetime.datetime.combine(datetime.date.min, datetime.time.min, self.timezone)
 
         self.connection = None # OPC UA connection
         self.config = None
@@ -90,14 +95,31 @@ class OPCUAcon(Thread):
         self.DriveEnergy = np.empty(len(self.master_conf))
 
         self.SaveasCSV = True
-        self.SaveasInflux = False
+        self.SaveasInflux = True
+        self.ServerInflux = "WS16" #Local or WS16(Cloud at ETH) Local not yet implemented 
         self.PrintMeasurements = True
         self.log_file_name = log_file_name
         self.argv = sys.argv
         self.executable = sys.executable
 
+        #WMES Setup for recording touch probe measurements
+        self.WMES_Counter = -1 #Counter for WMES observations, if it increases a new measurement was carried through. Increase triggers latch recording
+        self.WMES_node = []
+        self.WMES_Node_main_Name = "ns=2;s=.WMes_DATEN" #Node for WMES observation, followed by eg [15]
+        self.WMES_Nodes_IDs =list(range(1,17))
+        self.WMES_Meas = []
+
+
         self.init_logFile()  # Create a csv if it doesn't exist
 
+    def __del__(self):
+        self.unsubscribe()
+        self.client.disconnect()
+
+    def unsubscribe(self):
+        if self.sub:
+            self.sub.delete()
+            self.sub = None
 
     def pause(self):
         self.__flag.clear()  # Set to False to block the thread
@@ -117,28 +139,62 @@ class OPCUAcon(Thread):
                     writer = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
                     writer.writerow(['Date/Time'] + self.OPCNames)
 
+    def datachange_notification (self, node, val,data):
+        # Here you can call any function you want to handle the change
+        # For example:
+        if self.WMES_Counter>0:
+            print(f"WMES change on {node}: New value: {val}")
+            self.RecordTouchProbe()
+        self.WMES_Counter = val
 
-    def Listener(self):
-        #Records measurements and saves them TODO
-        1*1
+    def RecordTouchProbe(self):
+        #Only the value of the touch probe latch in the moving axis is recorded, the rest of the data is not used or stored currently
+        #The calculation of the DeltaX and DeltaY is done by checking the greater stop distance and not a clean solution
+        #TODO Get measurements into the main file in a clean way
+        def record():
+            # This is the original RecordTouchProbe logic, moved into a separate thread
+            datatmp = []
+            for i in range(len(self.WMES_node)):
+                try:
+                    datatmp.append(self.WMES_node[i].get_value())
+                except Exception as e:
+                    print(f"Error reading node: {e}")
+            DeltaX = datatmp[5] - datatmp[11]
+            DeltaY = datatmp[6] - datatmp[12]
+            if self.PrintMeasurements:
+                print(datatmp)
+            measurement_type = 'X' if abs(DeltaX) > abs(DeltaY) else 'Y'
+            measurement_value = datatmp[5] if measurement_type == 'X' else datatmp[6]
+            measurement_time = datetime.datetime.now(self.timezone).strftime("%Y-%m-%dT%H:%M:%S.%fZ")  # ISO 8601 format
+
+            self.WMES_Meas.append({
+                'time': measurement_time,
+                'type': measurement_type,
+                'value': measurement_value
+            })
+            self.Error_To_Influx_Counter += 1  
+        # Launch the record function in a new thread
+        record_thread = Thread(target=record)
+        record_thread.start()
+    def send_to_influx():
+        if self.WMES_Meas:  # Checks if there are measurements to send
+            influx_export(self.WMES_Meas, self.ServerInflux, self.MeasNames, self.timezone)
+            self.WMES_Meas.clear()  # Clear the measurements after sending
+        scheduler.enter(LogInfluxFrequency, 1, send_to_influx)  # Reschedule after LogInfluxFrequency / 10 seconds
 
     def ReadAxis(self):
         #GSX SercosIP,192.168.143.1,1,0”ParameterSet.“S-0-0383” (INT 16)  "SercosIP,192.168.143.12,0,0".ParameterSet."S-0-0383"
         #Zwischenkreisleistung
         #GA SercosIP,192.168.143.12,0,0”ParameterSet.“S-0-0382” (INT 16)
         for drive in range(int(len(self.node)/3)): #Careful hardcoded difference between drive temp and power (Zwischenkreisleistung), has to be adapted if extended
-            self.DriveTemp[drive] = self.node[drive].get_value()
+            self.DriveTemp[drive] = self.node[drive].get_value()/10
         for drive in range(int(len(self.node)/3)):
             self.DrivePower[drive] = self.node[drive+int(len(self.node)/3)].get_value()
         for drive in range(int(len(self.node)/3)):
             self.DriveEnergy[drive] = self.node[drive+int(len(self.node)/3*2)].get_value()
 
         #return self.DriveTemp probably not necessary as part of self?
-    def MonitorTouchProbe(self):
-        #TODO always active once called (Shutoff required?)
-        # Monitor changes in touch probe and when registered record wmes value and assign it to the correct measurement step
-        #TODO Adapt measurements depending on setable/callable measurement cycle --> Error calculation
-        1*1
+
 
     def writeData(self, t):
         if self.SaveasCSV:
@@ -152,7 +208,11 @@ class OPCUAcon(Thread):
 
         if self.SaveasInflux:
             try:
-                Influx.influx_export(t, self.ServerInflux)
+                if self.Error_To_Influx_Counter > 0:
+                    influx_export(t, self.ServerInflux,self.MeasNames,self.timezone)
+                    self.Error_To_Influx_Counter = 0
+                else:
+                    influx_export(t, self.ServerInflux,self.MeasNames,self.timezone)
             except:
                 print("Fail Write to influx, check internet connectivity")
                 raise Exception('influx')
@@ -195,6 +255,21 @@ class OPCUAcon(Thread):
                     +'ns=7;s="SercosIP,' + list(self.master_conf.values())[drive][
                     "sercosIP"] + '".ParameterSet."' + 'P-0-0851' + '"')
                 raise
+        #Connect nodes for touch probe observation
+        for wmesNode in range(len(self.WMES_Nodes_IDs)):
+           try:
+                   self.WMES_node.append(self.connection.get_node(self.WMES_Node_main_Name+'['+ str(self.WMES_Nodes_IDs[wmesNode]) +']'+ '"'))
+           except:
+               print('Failed to connect to WMES. Ensure they are active and the adress correct. Tried connecting to: '
+                   +self.WMES_Node_main_Name+ str(self.WMES_Nodes_IDs[wmesNode]) + '"')
+               raise #TODO Ensure that entire communication is restarted
+        #Subscribe to WMES observation
+        self.sub = self.connection.create_subscription(50, self) # 500 is the publishing interval in milliseconds
+        self.sub.subscribe_data_change(self.connection.get_node(self.WMES_node[15-1]))   
+        scheduler = sched.scheduler(time.time, time.sleep)
+        # Start the scheduler
+        scheduler.enter(self.LogInfluxFrequency, 1, self.send_to_influx)
+        scheduler.run()
 
     def run(self):
 
@@ -203,7 +278,7 @@ class OPCUAcon(Thread):
             print("Starting OPC Recording")
             while self.__running.isSet():
                 self.__flag.wait()  # Return immediately when it is True, block until the internal flag is True when it is False
-                currentTime = datetime.datetime.now()
+                currentTime = datetime.datetime.now(self.timezone)
                 # Read the values
                 if currentTime >= self.previousTime + datetime.timedelta(0, self.measurementFrequency):
                     self.ReadAxis()  # Read temperatures
@@ -213,7 +288,7 @@ class OPCUAcon(Thread):
                     # plt.plot(self.rtdTemperatures[0:len(self.rtdTemperatures)-1])
                     # plt.show()
                     self.writeData(self.Measurement[-1])  # Save to .csv or setting specific location
-                    self.previousTime = datetime.datetime.now()
+                    self.previousTime = currentTime
                 # Reset previousTime
             self.error = 0
         # return error_detection
