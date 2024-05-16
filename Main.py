@@ -37,7 +37,7 @@ matplotlib.use('TkAgg') #used for the plot to be shown in a window
 # -------------------------------------------------------------------------------------------------------------------------------------------------------
 # Machine Parameters
 MachineName = "EVO_Quinto"            #machine name
-mode        = "Compensation"          #set mode we are working with, either Sim or Compensation, or Log? TODO Log is supposed to be Online but without writing
+mode        = "Sim"          #set mode we are working with, either Sim or Compensation, or Log? TODO Log is supposed to be Online but without writing
 Compensation_Steps = 2000 #Number of Compensation Steps (multiple of measurement Frequency)
 ModelFrequency=10 #Model (not measurement) frequency in seconds for read-in new data in active compensation (ONLINE)
 log_file_name =  "C:\\Users\\Admin.AGATHON-7OEU3S8\\Desktop\\MainThermokompensation\\Messdaten\\Log_AP_22_02_2024.csv"
@@ -45,7 +45,7 @@ Logfrequency=1 #TODO Log only at logfrequency, measure and aggregate average/fil
 model_directory = "C:\\Users\\mzorzini\\OneDrive - ETH Zurich\\Zorzini_Inspire\\Semester_Project\\03_Python_Scripts\\Models_Storage"
 Comp_Model = 'ARX' #None, "ARX", "FFNN", "LSTM" define which Model to use for compensation
 Input_Selection_Model = None #None, 'LASSO', 'Group LASSO'
-
+save_load_model = False #True: Load or Save Model
 # -------------------------------------------------------------------------------------------------------------------------------------------------------
 # Feature Set Selection
 TemperatureSensors = True #True: Only Temperature Sensors will be used
@@ -64,12 +64,12 @@ Raw_PowerData = False #True: Raw Measurement Power Data will be used & used as F
 train_len = 0.56 #0.35 #0.8 (Only for OFFLINE, in ONLINE resp. Compensation Mode the Train Data is defined by the amount of data you load in)
 
 ######Excel Error File & Time Settings######
-start_time = "04/16/2024 02:40:00.00 PM" #"04/16/2024 01:40:00.00 PM" #"04/10/2024 05:00:00.00 PM"#"04/10/2024 05:00:00.00 PM"#"04/16/2024 03:00:00.00 PM" #"04/10/2024 05:00:00.00 PM" #"04/10/2024 05:00:00.00 PM" #"04/16/2024 03:00:00.00 PM" #"04/15/2024 02:00:00.00 PM" #"03/18/2024 04:10:00.00 PM" #This is the Time when the Imported Measurement Dataframe data should start to bea read in--> e.g. Training Dataframe for ONLINE, or whole Dataset for OFFLINE
-end_time = "04/27/2024 10:30:00.00 PM" #"04/26/2024 10:30:00.00 PM"#"04/17/2024 05:50:00.00 PM" #"04/17/2024 05:50:00.00 PM"  #"04/17/2024 10:00:00.00 AM" #"04/17/2024 03:45:00.00 PM" #"04/17/2024 05:50:00.00 PM"#"03/19/2024 10:30:00.00 AM" #"03/19/2024 10:30:00.00 AM" #This is the Time when the Imported Measurement Dataframe data should stop
+start_time = "04/16/2024 01:40:00.00 PM" #"04/16/2024 01:40:00.00 PM" #"04/10/2024 05:00:00.00 PM"#"04/10/2024 05:00:00.00 PM"#"04/16/2024 03:00:00.00 PM" #"04/10/2024 05:00:00.00 PM" #"04/10/2024 05:00:00.00 PM" #"04/16/2024 03:00:00.00 PM" #"04/15/2024 02:00:00.00 PM" #"03/18/2024 04:10:00.00 PM" #This is the Time when the Imported Measurement Dataframe data should start to bea read in--> e.g. Training Dataframe for ONLINE, or whole Dataset for OFFLINE
+end_time = "04/27/2024 10:30:00.00 PM"#"04/27/2024 10:30:00.00 PM" #"04/26/2024 10:30:00.00 PM"#"04/17/2024 05:50:00.00 PM" #"04/17/2024 05:50:00.00 PM"  #"04/17/2024 10:00:00.00 AM" #"04/17/2024 03:45:00.00 PM" #"04/17/2024 05:50:00.00 PM"#"03/19/2024 10:30:00.00 AM" #"03/19/2024 10:30:00.00 AM" #This is the Time when the Imported Measurement Dataframe data should stop
 # -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 #Data Loading
-MT = MT(MachineName, mode, ModelFrequency,log_file_name, Comp_Model, Input_Selection_Model, start_time, end_time, TemperatureSensors, Engineering_Know_SensorSet, Eval_SensorSet_Paper, EnergyToPower, indigTemp, cheap_Features, Raw_PowerData, EnergyToPower_NonSmoothedEnergy, Raw_indigTemp, Env_TempSensors, model_directory, Compensation_Steps, train_len)
+MT = MT(MachineName, mode, ModelFrequency,log_file_name, Comp_Model, Input_Selection_Model, start_time, end_time, TemperatureSensors, Engineering_Know_SensorSet, Eval_SensorSet_Paper, EnergyToPower, indigTemp, cheap_Features, Raw_PowerData, EnergyToPower_NonSmoothedEnergy, Raw_indigTemp, Env_TempSensors, model_directory, Compensation_Steps, train_len, save_load_model)
 del MachineName, mode, TemperatureSensors                   #deleting useless variable
 
 #machineSpec=load_DataMachine.specs()     #acess to all machine data from Machine method

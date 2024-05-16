@@ -47,6 +47,8 @@ class Model:
         self.Original_InputData = None  # Original Input Data before sampling to Error Data (only for OFFLINE)
         # Timestamp of the current prediction OFFLINE
         self.Timestamp = None  # Timestamp of the current prediction
+        # save or load a model
+        self.save_load_model = None
 
 
     def Generate(self):
@@ -69,10 +71,10 @@ class Model:
     def save_or_load_model(self, key):
         model_file = os.path.join(self.model_directory, f'{key}_model.pkl')
         model_file_Inputs = os.path.join(self.model_directory, f'{key}_model_Inputs.pkl')
-        model_save = False
+        model_save = self.save_load_model #set true if a model should be read in or saved, it only saves a model if no previous available
 
         # Check if the model file exists
-        if os.path.exists(model_file):
+        if os.path.exists(model_file) and model_save:
             # Load the model from the file
             with open(model_file, 'rb') as file:
                 self.models_fit[key] = pickle.load(file)
@@ -143,8 +145,9 @@ class Model:
                     print(f"Saved model for key {key} to {model_file}")
 
                 with open(model_file_Inputs, 'wb') as file:
-                    pickle.dump(pickle.dump(self.MT_data.Selected_Input_Names[key], file), file)
-                    print(f"Saved selected feature names for key {key} to {model_file_Inputs}")
+                    if self.MT_data.Selected_Input_Names is not None:
+                        pickle.dump(pickle.dump(self.MT_data.Selected_Input_Names[key], file), file)
+                        print(f"Saved selected feature names for key {key} to {model_file_Inputs}")
 
     def Model_TrainPredict(self, Error_train, key):
         '''

@@ -23,7 +23,7 @@ class MT:
     - It is used to initialize the all classes and to run the compensation model
     - This is the actual "Main" class
     '''
-    def __init__(self, Name, mode,measurementFrequency,log_file_name, Comp_Model, Input_Selection_Model, start_time, end_time, TemperatureSensors, Engineering_Know_SensorSet, Eval_SensorSet_Paper, EnergyToPower, indigTemp, cheap_Features, Raw_PowerData, EnergyToPower_NonSmoothedEnergy, Raw_indigTemp, Env_TempSensors, model_directory, Compensation_Steps, train_len):
+    def __init__(self, Name, mode,measurementFrequency,log_file_name, Comp_Model, Input_Selection_Model, start_time, end_time, TemperatureSensors, Engineering_Know_SensorSet, Eval_SensorSet_Paper, EnergyToPower, indigTemp, cheap_Features, Raw_PowerData, EnergyToPower_NonSmoothedEnergy, Raw_indigTemp, Env_TempSensors, model_directory, Compensation_Steps, train_len, save_load_model):
         #Print Machine Information
         def print_machine_info(name, mode, measurement_frequency):
             '''
@@ -79,6 +79,7 @@ class MT:
             self.Model.MT_data = self.MT_General_Data
             self.Model.ModelType = Comp_Model
             self.Model.model_directory = model_directory
+            self.Model.save_load_model = save_load_model
 
         if self.ModelActive==False:
             print("No Model is active, no compensation possible, please select a model in the settings in the Main-File.")

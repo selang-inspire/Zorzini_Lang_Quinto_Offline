@@ -7,11 +7,11 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
-import os
 from datetime import datetime
 from pytz import timezone
 import copy
-
+import subprocess
+import os
 
 
 
@@ -22,7 +22,7 @@ class AGATHON_Com:
     '''
     def __init__(self, IP_Log_File, IP_Overwrite_File):
         self.IP_Log_File = "C:\\Users\\mzorzini\\Documents\\IPJSon\\IpInputLog4R.tmp" #IP_Log_File
-        self.IP_Overwrite_File = "C:\\Users\\mzorzini\\Documents\\IPJSon\\IpInputLog4R_write.tmp" #IP_Overwrite_File
+        self.IP_Overwrite_File = "C:\\Users\\mzorzini\\Documents\\IPJSon\\IpInputDat.txt" #IP_Overwrite_File
         self.copy_and_rename_file(self.IP_Log_File)
         self.Prediction = pd.DataFrame(columns=["Time", "X Offset LR", "Y Offset LR", "Z Offset LR", "Anvil LR", "Pivot C2B LR", "X Offset RR", "Y Offset RR", "Z Offset RR", "Anvil RR", "Pivot C2B RR"])
         self.IP_Comp_Values = pd.DataFrame(columns=["Time", "X Offset LR", "Y Offset LR", "Z Offset LR", "Anvil LR", "Pivot C2B LR", "X Offset RR", "Y Offset RR", "Z Offset RR", "Anvil RR", "Pivot C2B RR"])
@@ -133,10 +133,61 @@ class AGATHON_Com:
         f.write(contents_new)
         f.close()
 
+    def Write_Interpreter_Overwrite_Test(self):
+        # Read all lines from the file
+        with open(self.IP_Overwrite_File, "r") as f:
+            lines = f.readlines()
+
+        # Define offset to correct
+        locnr = len(self.Prediction) - 1
+
+        # Define the new line contents
+        new_line_contents = {
+            "XOffsCorr4LR": "\nXOffsCorr4LR = " + str(
+                self.Prediction.loc[locnr, "X Offset LR"] + self.IP_Comp_Values.loc[0, "X Offset LR"]) + " ;" + "\n",
+            "XOffsCorr4RR": "XOffsCorr4RR = " + str(
+                self.Prediction.loc[locnr, "X Offset RR"] + self.IP_Comp_Values.loc[0, "X Offset RR"]) + " ;" + "\n",
+            "YOffsCorr4LR": "YOffsCorr4LR = " + str(
+                self.Prediction.loc[locnr, "Y Offset LR"] + self.IP_Comp_Values.loc[0, "Y Offset LR"]) + " ;" + "\n",
+            "YOffsCorr4RR": "YOffsCorr4RR = " + str(
+                self.Prediction.loc[locnr, "Y Offset RR"] + self.IP_Comp_Values.loc[0, "Y Offset RR"]) + " ;" + "\n",
+            "ZOffsCorr4LR": "ZOffsCorr4LR = " + str(
+                self.Prediction.loc[locnr, "Z Offset LR"] + self.IP_Comp_Values.loc[0, "Z Offset LR"]) + " ;" + "\n",
+            "ZOffsCorr4RR": "ZOffsCorr4RR = " + str(
+                self.Prediction.loc[locnr, "Z Offset RR"] + self.IP_Comp_Values.loc[0, "Z Offset RR"]) + " ;" + "\n",
+            "AnvilCorr4LR": "AnvilCorr4LR = " + str(
+                self.Prediction.loc[locnr, "Anvil LR"] + self.IP_Comp_Values.loc[0, "Anvil LR"]) + " ;" + "\n",
+            "AnvilCorr4RR": "AnvilCorr4RR = " + str(
+                self.Prediction.loc[locnr, "Anvil RR"] + self.IP_Comp_Values.loc[0, "Anvil RR"]) + " ;" + "\n",
+            "PivotC2B_4LR": "PivotC2B_4LR = " + str(
+                self.Prediction.loc[locnr, "Pivot C2B LR"] + self.IP_Comp_Values.loc[0, "Pivot C2B LR"]) + " ;" + "\n",
+            "PivotC2B_4RR": "PivotC2B_4RR = " + str(
+                self.Prediction.loc[locnr, "Pivot C2B RR"] + self.IP_Comp_Values.loc[0, "Pivot C2B RR"]) + " ;" + "\n"
+        }
+
+        # Find the lines to overwrite and replace them with the new content
+        for i, line in enumerate(lines):
+            stripped_line = line.lstrip()  # Strip leading whitespace
+            for key, new_line_content in new_line_contents.items():
+                if stripped_line.startswith(key):
+                    lines[i] = new_line_content
+
+                    # Write all lines back to the file
+        with open(self.IP_Overwrite_File, "w") as f:
+            f.writelines(lines)
+
+    def runJSON(self):
+        exe_path = r"C:\Users\mzorzini\Documents\IPJSon\IPJSon.exe"
+        exe_dir = os.path.dirname(exe_path)
+        subprocess.run(exe_path, check=True, cwd=exe_dir)
+        print("JSON Executed")
+
     def Compensation_To_Machine(self):
         # TODO IP input overwrite
 
         # Read Current Interpreter values and safe them and the time in IP_Comp_Values
         self.Read_State_Interpreter()
         # ReadTxt from overwrite file, which is subsequently modified
-        self.Write_Interpreter_Overwrite()
+        self.Write_Interpreter_Overwrite_Test()
+        #self.Write_Interpreter_Overwrite()
+        self.runJSON() #onyl for Testing

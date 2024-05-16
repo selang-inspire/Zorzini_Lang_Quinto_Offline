@@ -71,7 +71,7 @@ class ActiveCompensation:
             # check values if they are in an appropriate range
             for keys in newest_prediction.keys():
                 value_in_mu = newest_prediction[keys]['Wert_4'][step]
-                if value_in_mu > 1000:
+                if value_in_mu > 150:
                     print("\033[91mPrediction is too high, check the Input Data\033[0m")
                     breakpoint() # for debugging
                     #exit()
@@ -95,7 +95,7 @@ class ActiveCompensation:
                 self.LastRecentTemp = self.Actual_Input_DF.drop(self.Actual_Input_DF.index[-1])
         else:
             self.Actual_Input_DF = Actual_Input_DF
-        self.Actual_Input_DF = self.Actual_Input_DF.tail(1) # get newest one
+        self.Actual_Input_DF = self.Actual_Input_DF.tail(1) # get newest one (letzte zeile)
         ###Only TempData end###
         self.current_time = self.Actual_Input_DF['Time'].iloc[-1] # get actual time
 
@@ -121,7 +121,7 @@ class ActiveCompensation:
 
         if self.MT_general.Selected_Input_Names is not None:
             for key, columns in self.MT_general.Selected_Input_Names.items():
-                Actual_Input_DF1 = self.Actual_Input_DF.copy()
+                Actual_Input_DF1 = self.Actual_Input_DF.copy() #self.Actual_Input_DF is the actual input data, set copy()
                 self.selected_input_test[key] = Actual_Input_DF1[columns]
         else:
             for key in self.MT_general.Full_Input_bucket.keys():
@@ -136,7 +136,13 @@ class ActiveCompensation:
             # Nullen--> substract reference
             for column in self.selected_input_test[key].columns:
                 if column != 'Time':
-                    self.selected_input_test[key].loc[:, column] = self.selected_input_test[key][column] - self.MT_general.Reference_Input[key][column].values[0]
+                    # Create a copy of the DataFrame
+                    df_copy = self.selected_input_test[key].copy()
+                    # Perform the operation on the copy
+                    df_copy.loc[:, column] = df_copy[column] - self.MT_general.Reference_Input[key][column].values[0]
+                    # Assign the modified DataFrame back to the original
+                    self.selected_input_test[key] = df_copy
+                    #self.selected_input_test[key].loc[:, column] = self.selected_input_test[key][column] - self.MT_general.Reference_Input[key][column].values[0]
             self.MT_general.Test_Input_bucket[key] = pd.concat([self.MT_general.Test_Input_bucket[key], self.selected_input_test[key]])
         # ------------------------------------------------------------------------------------------------------------------------------------------------------------
         # Only for the first step to get the Temperature Data before the compensation starts for PADDING Temp Data
@@ -164,7 +170,7 @@ class ActiveCompensation:
             # Create a copy of the DataFrame excluding the 'Time' column
             df_without_time = self.LastRecentTemp_dict[keys].drop(columns='Time')
             # Check if any value in the DataFrame is smaller than -30 or bigger than 30
-            if df_without_time.values.min() < -30 or df_without_time.values.max() > 30:
+            if df_without_time.values.min() < -20 or df_without_time.values.max() > 20:
                 print("\033[91mInput Data is not in an appropriate range\033[0m")
                 breakpoint()  # for debugging
                 # exit()

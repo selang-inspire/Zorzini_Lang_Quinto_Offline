@@ -360,7 +360,7 @@ class FeatureProcessing:
         smooth_energy = self.apply_moving_average(EnergyData, window_size=30)
         Features_Power = self.calculate_power(smooth_energy.copy())
         Features_Power_NonSmoothed = self.calculate_power(EnergyData.copy())
-        """
+        """ 
         if self.mode == 'Sim':
             self.plot_power_and_original_and_energy_w_wo_smoothed_separated_exp(EnergyData.copy(), Features_Power.copy(), self.Features_power_meas.copy(), smooth_energy.copy(), Features_Power_NonSmoothed.copy())
         """
