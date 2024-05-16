@@ -39,7 +39,8 @@ class InfluxDBQuery: #TODO: Better Modularity for changing the InfluxDB accordin
         if start_iso == None or end_iso == None: #get measurement from last 5 minutes and use newest measurement
             query = f'from(bucket: "{self.queryName}")\
                     |> range(start: -5m)\
-                    |> filter(fn: (r) => r["_measurement"] =~ /.*/)'
+                    |> filter(fn: (r) => r["_measurement"] =~ /.*/)\
+                    |> yield(name: "mean")'
                     #|> last()'
         else: #get a range of measurements--> e.g. training data
             query = f'from(bucket: "{self.queryName}")\

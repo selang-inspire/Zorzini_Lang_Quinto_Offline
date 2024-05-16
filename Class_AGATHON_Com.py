@@ -29,20 +29,25 @@ class AGATHON_Com:
 
     def copy_and_rename_file(self, source_file):
         '''
-        Copy the IP_Log_File file and rename it as Initial_IP_Log_File
+        - Copy the IP_Log_File file and rename it as Initial_IP_Log_File
+        - The Initial_IP_Log_File should be used as a reference
         '''
         # Define the destination file
         destination_file = source_file.replace("IpInputLog4R.tmp", "initial_IpInputLog4R.tmp")
-        # Open the source file and read its content
-        with open(source_file, 'rb') as src_file:
-            content = src_file.read()
-        # Open the destination file in write mode and write the content
-        with open(destination_file, 'wb') as dest_file:
-            dest_file.write(content)
+        if not os.path.exists(destination_file):
+            # Open the source file and read its content
+            with open(source_file, 'rb') as src_file:
+                content = src_file.read()
+            # Open the destination file in write mode and write the content
+            with open(destination_file, 'wb') as dest_file:
+                dest_file.write(content)
+            print("File IpInputLog4R.tmp copied and renamed successfully")
 
     def Read_State_Interpreter(self):
         # Read previous status from IP
-        logf = open(self.IP_Log_File, "r")
+        source_file = self.IP_Log_File
+        source = source_file.replace("IpInputLog4R.tmp", "initial_IpInputLog4R.tmp")
+        logf = open(source, "r")
         IP_Params = logf.read()
         entries = IP_Params.split(";")
         # Create a list to hold the name-value pairs
@@ -177,6 +182,9 @@ class AGATHON_Com:
             f.writelines(lines)
 
     def runJSON(self):
+        '''
+        Only for Testing (NOT USED IN PRODUCTION)
+        '''
         exe_path = r"C:\Users\mzorzini\Documents\IPJSon\IPJSon.exe"
         exe_dir = os.path.dirname(exe_path)
         subprocess.run(exe_path, check=True, cwd=exe_dir)

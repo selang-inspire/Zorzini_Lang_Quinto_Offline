@@ -72,7 +72,7 @@ class ActiveCompensation:
             for keys in newest_prediction.keys():
                 value_in_mu = newest_prediction[keys]['Wert_4'][step]
                 if value_in_mu > 150:
-                    print("\033[91mPrediction is too high, check the Input Data\033[0m")
+                    print("\033[91mPrediction is too high, check the Data\033[0m")
                     breakpoint() # for debugging
                     #exit()
             self.Error_Corrections.insert_predictions(newest_prediction, step)
@@ -95,6 +95,17 @@ class ActiveCompensation:
                 self.LastRecentTemp = self.Actual_Input_DF.drop(self.Actual_Input_DF.index[-1])
         else:
             self.Actual_Input_DF = Actual_Input_DF
+        ############################################################################################################
+        # if last row of self.Actual_Input_DF contains 0 values then fill only where the zero is with the value from the previous row
+        # Exclude 'Time' column
+        columns_to_check = [col for col in self.Actual_Input_DF.columns if col != 'Time']
+        # Apply the operation to the selected columns
+        self.Actual_Input_DF[columns_to_check] = self.Actual_Input_DF[columns_to_check].map(lambda val: np.nan if val < 0.05 else val)
+        if (self.Actual_Input_DF.iloc[-1] == np.nan).any():
+            #self.Actual_Input_DF.iloc[-1] = self.Actual_Input_DF.iloc[-1].replace(0, np.nan)
+            self.Actual_Input_DF.fillna(method='ffill', inplace=True)
+            print("\033[91mNaN values were replaced with the previous value\033[0m")
+        ############################################################################################################
         self.Actual_Input_DF = self.Actual_Input_DF.tail(1) # get newest one (letzte zeile)
         ###Only TempData end###
         self.current_time = self.Actual_Input_DF['Time'].iloc[-1] # get actual time
@@ -138,6 +149,8 @@ class ActiveCompensation:
                 if column != 'Time':
                     # Create a copy of the DataFrame
                     df_copy = self.selected_input_test[key].copy()
+                    #start_index = df_copy.index[0]
+                    #self.MT_general.Reference_Input[key].index = [start_index]
                     # Perform the operation on the copy
                     df_copy.loc[:, column] = df_copy[column] - self.MT_general.Reference_Input[key][column].values[0]
                     # Assign the modified DataFrame back to the original
@@ -166,9 +179,9 @@ class ActiveCompensation:
                     if column != 'Time':
                         self.LastRecentTemp_dict[key].loc[:, column] = self.LastRecentTemp_dict[key][column] - self.MT_general.Reference_Input[key][column].values[0]
         # check values if they are in an appropriate range
-        for keys in self.LastRecentTemp_dict.keys():
+        for keys in self.selected_input_test.keys():
             # Create a copy of the DataFrame excluding the 'Time' column
-            df_without_time = self.LastRecentTemp_dict[keys].drop(columns='Time')
+            df_without_time = self.selected_input_test[keys].drop(columns='Time')
             # Check if any value in the DataFrame is smaller than -30 or bigger than 30
             if df_without_time.values.min() < -20 or df_without_time.values.max() > 20:
                 print("\033[91mInput Data is not in an appropriate range\033[0m")
