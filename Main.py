@@ -37,7 +37,7 @@ matplotlib.use('TkAgg') #used for the plot to be shown in a window
 # -------------------------------------------------------------------------------------------------------------------------------------------------------
 # Machine Parameters
 MachineName = "EVO_Quinto"            #machine name
-mode        = "Sim"          #set mode we are working with, either Sim or Compensation, or Log? TODO Log is supposed to be Online but without writing
+mode        = "Compensation"          #set mode we are working with, either Sim or Compensation, or Log? TODO Log is supposed to be Online but without writing
 Compensation_Steps = 2000 #Number of Compensation Steps (multiple of measurement Frequency)
 ModelFrequency=10 #Model (not measurement) frequency in seconds for read-in new data in active compensation (ONLINE)
 log_file_name =  "C:\\Users\\Admin.AGATHON-7OEU3S8\\Desktop\\MainThermokompensation\\Messdaten\\Log_AP_22_02_2024.csv"

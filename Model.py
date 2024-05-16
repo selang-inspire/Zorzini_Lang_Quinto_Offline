@@ -71,8 +71,8 @@ class Model:
     def save_or_load_model(self, key):
         model_file = os.path.join(self.model_directory, f'{key}_model.pkl')
         model_file_Inputs = os.path.join(self.model_directory, f'{key}_model_Inputs.pkl')
-        model_save = self.save_load_model #set true if a model should be read in or saved, it only saves a model if no previous available
-
+        model_save = self.save_load_model # set true if a model should be read in or saved, it only saves a model if no previous available
+        #self.Plot_TrainData(self.TrainData_Input[key], self.TrainData_Output[key], key) # uncomment for plotting Traindata
         # Check if the model file exists
         if os.path.exists(model_file) and model_save:
             # Load the model from the file
@@ -85,6 +85,7 @@ class Model:
                 print(f"Loaded selected feature names for key {key} from {model_file_Inputs}")
                 print(f"Selected feature names for key {key}: {self.MT_data.Selected_Input_Names[key]}")
                 print("-" * 100)
+
 
         else:
             if self.ModelType == "ARX":
@@ -148,6 +149,7 @@ class Model:
                     if self.MT_data.Selected_Input_Names is not None:
                         pickle.dump(pickle.dump(self.MT_data.Selected_Input_Names[key], file), file)
                         print(f"Saved selected feature names for key {key} to {model_file_Inputs}")
+
 
     def Model_TrainPredict(self, Error_train, key):
         '''
@@ -860,3 +862,131 @@ class Model:
             plt.show()
             # plt.close()
 
+    def Plot_TrainData(self, train_inputs, Train_outputs, key):
+        '''
+        - This function is used to plot the training data
+        - The training data is plotted for each key in the dictionary
+        '''
+        color_dict = {
+            'X0B': 'red',
+            'Y0B': 'green',
+            'Z0B': 'blue',
+            'X0C': 'darkred',
+            'Y0C': 'darkgreen',
+            'A0B': 'red',
+            'C0B': 'blue',
+            'B0B': 'green',
+            'A0C': 'darkred',
+            'C0C': 'darkblue',
+            'B0C': 'darkgreen',
+            'X0X': 'red',
+            'Y0Y': 'green',
+            'Z0Z': 'blue',
+            'Y0X': 'green',
+            'Z0X': 'blue',
+            'A0X': 'red',
+            'C0X': 'blue',
+            'B0X': 'green',
+            'A0Y': 'red',
+            'C0Y': 'blue',
+            'B0Y': 'green',
+            'A0Z': 'red',
+            'C0Z': 'blue',
+            'B0Z': 'green',
+            'X0Y': 'red',
+            'X0Z': 'red',
+            'Y0Z': 'green',
+            'X0A': 'red',
+            'Y0A': 'green',
+            'Z0A': 'blue',
+            'A0A': 'red',
+            'C0A': 'blue',
+            'B0A': 'green'
+        }
+        # set copies
+        train_inputs_copy = train_inputs.copy()
+        Train_outputs_copy = Train_outputs.copy()
+        jumpcoyp = train_inputs.copy()
+        # Convert 'Time' column to datetime format
+        train_inputs_copy['Time'] = pd.to_datetime(train_inputs_copy['Time'])
+        Train_outputs_copy['Time'] = pd.to_datetime(Train_outputs_copy['Time'])
+
+        # Convert 'Time' column to seconds from the start of the data
+        train_inputs_copy['Time'] = (train_inputs_copy['Time'] - train_inputs_copy['Time'].iloc[
+            0]).dt.total_seconds() / 3600
+        Train_outputs_copy['Time'] = (Train_outputs_copy['Time'] - Train_outputs_copy['Time'].iloc[
+            0]).dt.total_seconds() / 3600
+
+        # Ensure that 'Time' column is in datetime format
+        jumpcoyp['Time'] = pd.to_datetime(jumpcoyp['Time'], unit='s')
+        # Calculate the time difference between each row and the previous one
+        jumpcoyp['TimeDifference'] = jumpcoyp['Time'].diff()
+        # Find the rows where 'TimeDifference' is greater than 600 seconds (which is 10 minutes)
+        gap_indices = jumpcoyp[jumpcoyp['TimeDifference'] > pd.Timedelta(minutes=10)].index
+
+        # Loop through all the gap indices
+        for axs in gap_indices:
+            # Calculate the gap
+            gap = train_inputs_copy.loc[axs, 'Time'] - train_inputs_copy.loc[axs - 1, 'Time']
+            # Subtract the total shift from the current gap to get the actual shift for this gap
+            actual_shift = gap
+            # Shift the subsequent times
+            train_inputs_copy.loc[axs:, 'Time'] -= actual_shift
+
+        # Loop through all the gap indices
+        for axis in gap_indices:
+            # Calculate the gap
+            gap = Train_outputs_copy.loc[axis, 'Time'] - Train_outputs_copy.loc[axis - 1, 'Time']
+            # Subtract the total shift from the current gap to get the actual shift for this gap
+            actual_shift = gap
+            # Shift the subsequent times
+            Train_outputs_copy.loc[axis:, 'Time'] -= actual_shift
+
+        # Loop through all the gap indices
+        for ax in gap_indices:
+            # Calculate the gap
+            gap = jumpcoyp.loc[ax, 'Time'] - jumpcoyp.loc[ax - 1, 'Time']
+            # Subtract the total shift from the current gap to get the actual shift for this gap
+            actual_shift = gap
+            # Shift the subsequent times
+            jumpcoyp.loc[ax:, 'Time'] -= actual_shift
+
+        # Drop the 'TimeDifference' column as it's no longer needed
+        jumpcoyp = jumpcoyp.drop(columns=['TimeDifference'])
+        jumpcoyp = self.MT_data.convert_time_to_seconds(jumpcoyp)
+
+        gap_timestamps = []
+        for ui in gap_indices:
+            # Calculate the gap
+            gap_timestamps.append(jumpcoyp.loc[ui, 'Time'])
+
+        # Create subplots
+        fig, axs = plt.subplots(2, 1, figsize=(19, 10), sharex=True)
+
+        # Plot Thermal Error
+        axs[0].set_title(f'Train Data for Thermal Error $E_{{{key}}}$', fontsize=16, loc='center')
+        axs[0].plot(Train_outputs_copy['Time'], Train_outputs_copy['Wert_4'], label=f'$E_{{{key}}}$', linewidth=2, color = color_dict[key])
+        axs[0].set_ylabel('Thermal Error [μm]', fontsize=16)
+        #axs[0].legend(fontsize=12)
+        axs[0].grid(True)  # Add grid
+        axs[0].tick_params(axis='both', labelsize=14)
+        if gap_timestamps:
+            for timestamp in gap_timestamps:
+                axs[0].axvline(timestamp / 3600, color='red', linestyle='-', linewidth=5, alpha=0.55)
+
+        # Plot Input
+        for column in train_inputs_copy.columns:
+            if column != 'Time':
+                axs[1].plot(train_inputs_copy['Time'], train_inputs_copy[column], label=column, linewidth=2)
+        axs[1].set_xlabel('Time [h]', fontsize=16)
+        axs[1].set_ylabel('△ Temperature [K]', fontsize=16)
+        axs[1].legend(loc='lower center', ncol=7, fontsize=12)
+        axs[1].grid(True)  # Add grid
+        axs[1].tick_params(axis='both', labelsize=14)
+        if gap_timestamps:
+            for timestamp in gap_timestamps:
+                axs[1].axvline(timestamp / 3600, color='red', linestyle='-', linewidth=5, alpha=0.55)
+        plt.tight_layout()
+        plt.savefig(f'C:\\Users\\mzorzini\\OneDrive - ETH Zurich\\Zorzini_Inspire\\Semester_Project\\02_Measurements\\Traindata\\{key}_TrainData.png', dpi=300)
+        plt.show()
+        plt.close()
