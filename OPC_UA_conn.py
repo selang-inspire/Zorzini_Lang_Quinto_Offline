@@ -164,23 +164,29 @@ class OPCUAcon(Thread):
             if self.PrintMeasurements:
                 print(datatmp)
             measurement_type = 'X' if abs(DeltaX) > abs(DeltaY) else 'Y'
-            measurement_value = datatmp[5] if measurement_type == 'X' else datatmp[6]
+            #measurement_value = datatmp[5] if measurement_type == 'X' else datatmp[6]
             measurement_time = datetime.datetime.now(self.timezone).strftime("%Y-%m-%dT%H:%M:%S.%fZ")  # ISO 8601 format
 
             self.WMES_Meas.append({
                 'time': measurement_time,
                 'type': measurement_type,
-                'value': measurement_value
+                'X': datatmp[5],
+                'Y': datatmp[6],
+                'MB': datatmp[7],
+                'A': datatmp[2],
+                'B': datatmp[3],
+                'C': datatmp[4],
             })
-            self.Error_To_Influx_Counter += 1  
         # Launch the record function in a new thread
         record_thread = Thread(target=record)
         record_thread.start()
-    def send_to_influx():
+    def send_to_influx(self):
         if self.WMES_Meas:  # Checks if there are measurements to send
             influx_export(self.WMES_Meas, self.ServerInflux, self.MeasNames, self.timezone)
             self.WMES_Meas.clear()  # Clear the measurements after sending
-        scheduler.enter(LogInfluxFrequency, 1, send_to_influx)  # Reschedule after LogInfluxFrequency / 10 seconds
+        
+        self.scheduler.enter(self.LogInfluxFrequency, 1, self.send_to_influx)  # Reschedule after LogInfluxFrequency / 10 seconds
+
 
     def ReadAxis(self):
         #GSX SercosIP,192.168.143.1,1,0”ParameterSet.“S-0-0383” (INT 16)  "SercosIP,192.168.143.12,0,0".ParameterSet."S-0-0383"
@@ -195,6 +201,10 @@ class OPCUAcon(Thread):
 
         #return self.DriveTemp probably not necessary as part of self?
 
+    def start_scheduler(self):
+        # Schedules the send_to_influx method and starts the scheduler
+        self.scheduler.enter(self.LogInfluxFrequency, 1, self.send_to_influx)
+        self.scheduler.run()
 
     def writeData(self, t):
         if self.SaveasCSV:
@@ -208,11 +218,7 @@ class OPCUAcon(Thread):
 
         if self.SaveasInflux:
             try:
-                if self.Error_To_Influx_Counter > 0:
-                    influx_export(t, self.ServerInflux,self.MeasNames,self.timezone)
-                    self.Error_To_Influx_Counter = 0
-                else:
-                    influx_export(t, self.ServerInflux,self.MeasNames,self.timezone)
+                influx_export(t, self.ServerInflux,self.MeasNames,self.timezone)
             except:
                 print("Fail Write to influx, check internet connectivity")
                 raise Exception('influx')
@@ -266,14 +272,15 @@ class OPCUAcon(Thread):
         #Subscribe to WMES observation
         self.sub = self.connection.create_subscription(50, self) # 500 is the publishing interval in milliseconds
         self.sub.subscribe_data_change(self.connection.get_node(self.WMES_node[15-1]))   
-        scheduler = sched.scheduler(time.time, time.sleep)
-        # Start the scheduler
-        scheduler.enter(self.LogInfluxFrequency, 1, self.send_to_influx)
-        scheduler.run()
+        self.scheduler = sched.scheduler(time.time, time.sleep)
+        # Start the scheduler in a separate thread
+        scheduler_thread = Thread(target=self.start_scheduler)
+        scheduler_thread.daemon = True  # Make daemon if you want it to automatically exit when the main program exits
+        scheduler_thread.start()
 
     def run(self):
 
-        try:
+        #try:
             self.init_connection()
             print("Starting OPC Recording")
             while self.__running.isSet():
@@ -292,8 +299,9 @@ class OPCUAcon(Thread):
                 # Reset previousTime
             self.error = 0
         # return error_detection
-        except:
-            print('Error raised while loading or exporting data')
-            self.error = 1
-            print("restarting")
-            os.execv(self.executable, ["python"] + self.argv) #TODO Ensure restart here!!!
+        
+        # except:
+        #     print('Error raised while loading or exporting data')
+        #     self.error = 1
+        #     print("restarting")
+        #     os.execv(self.executable, ["python"] + self.argv) #TODO Ensure restart here!!!

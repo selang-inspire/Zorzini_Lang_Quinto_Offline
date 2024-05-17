@@ -96,15 +96,20 @@ class ActiveCompensation:
         else:
             self.Actual_Input_DF = Actual_Input_DF
         ############################################################################################################
+        #TODO: This part must be changed if other Inputs than temperature is considered
         # if last row of self.Actual_Input_DF contains 0 values then fill only where the zero is with the value from the previous row
         # Exclude 'Time' column
         columns_to_check = [col for col in self.Actual_Input_DF.columns if col != 'Time']
         # Apply the operation to the selected columns
         self.Actual_Input_DF[columns_to_check] = self.Actual_Input_DF[columns_to_check].map(lambda val: np.nan if val < 0.05 else val)
-        if (self.Actual_Input_DF.iloc[-1] == np.nan).any():
-            #self.Actual_Input_DF.iloc[-1] = self.Actual_Input_DF.iloc[-1].replace(0, np.nan)
-            self.Actual_Input_DF.fillna(method='ffill', inplace=True)
+        if self.Actual_Input_DF.isnull().values.any():
+            self.Actual_Input_DF.ffill(inplace=True)
             print("\033[91mNaN values were replaced with the previous value\033[0m")
+        # Check if there are any NaN values in the 'Time' column
+        if self.Actual_Input_DF['Time'].isnull().any():
+            # Fill NaN values with the current datetime
+            self.Actual_Input_DF['Time'].fillna(datetime.now(), inplace=True)
+            print("\033[91mNaN values for Time, therefore actual Time was set\033[0m")
         ############################################################################################################
         self.Actual_Input_DF = self.Actual_Input_DF.tail(1) # get newest one (letzte zeile)
         ###Only TempData end###

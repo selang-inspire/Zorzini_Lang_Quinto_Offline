@@ -31,8 +31,8 @@ class EVO_Quinto:
         #mc.FilePathTemperature = r'C:\Users\' #TODO
 
         self.Reference=9.5;
-    def ConnectMachine(self,measurementFrequency):
-        self.OPC = OPCUAcon(measurementFrequency,self.log_file_name)
+    def ConnectMachine(self,measurementFrequency,LogInfluxFrequency):
+        self.OPC = OPCUAcon(measurementFrequency,self.log_file_name,LogInfluxFrequency)
     def OfflineFileData(self):
         #loading from excel
         Temperature = pd.read_excel (self.FilePathTemperature)

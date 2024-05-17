@@ -23,7 +23,7 @@ class MT:
     - It is used to initialize the all classes and to run the compensation model
     - This is the actual "Main" class
     '''
-    def __init__(self, Name, mode,measurementFrequency,log_file_name, Comp_Model, Input_Selection_Model, start_time, end_time, TemperatureSensors, Engineering_Know_SensorSet, Eval_SensorSet_Paper, EnergyToPower, indigTemp, cheap_Features, Raw_PowerData, EnergyToPower_NonSmoothedEnergy, Raw_indigTemp, Env_TempSensors, model_directory, Compensation_Steps, train_len, save_load_model):
+    def __init__(self, Name, mode,ModelFrequency,log_file_name, Comp_Model, Input_Selection_Model, start_time, end_time, TemperatureSensors, Engineering_Know_SensorSet, Eval_SensorSet_Paper, EnergyToPower, indigTemp, cheap_Features, Raw_PowerData, EnergyToPower_NonSmoothedEnergy, Raw_indigTemp, Env_TempSensors, model_directory, Compensation_Steps, train_len, save_load_model, LogInfluxFrequency, measurementFrequency):
         #Print Machine Information
         def print_machine_info(name, mode, measurement_frequency):
             '''
@@ -33,10 +33,11 @@ class MT:
             machine_details = f'Machine Name: {Fore.GREEN}{name}{Style.RESET_ALL}\n' + '-' * 100 + '\n' + f'Mode: {Fore.BLUE}{mode}{Style.RESET_ALL}\n' + '-' * 100 + '\n' + f'Model Frequency: {Fore.RED}{measurement_frequency} Seconds{Style.RESET_ALL}\n' + '=' * 100
             print(header_footer + machine_details)
 
-        print_machine_info(Name, mode, measurementFrequency)
+        print_machine_info(Name, mode, ModelFrequency)
 
         #Import Machine specific package depending on which machine is used
         self.ModelActive = False
+        self.LogInfluxFrequency = LogInfluxFrequency
         self.InputSelectionActive = False
         self.TempSensors = TemperatureSensors
         self.EnergyToPower = EnergyToPower
@@ -107,12 +108,12 @@ class MT:
             self.Compensation_Steps = Compensation_Steps #How many predictions are made (multiple of model Frequency)
             self.ThermalError = {} #are dictionaries which contains pandaDf (Training Error Data)
             self.Inputs = {} #are dictionaries which contains pandaDf (Training Input Data)
-            # self.Machine.ConnectMachine(measurementFrequency) #TODO: in echter ONLINE umgebung dann auskommentieren 27/03/2024 16:33
+            # self.Machine.ConnectMachine(measurementFrequency,self.LogInfluxFrequency) #TODO: in echter ONLINE umgebung dann auskommentieren 27/03/2024 16:33
             # thread = Thread(target = self.Machine.OPC.start(), daemon=True) #TODO: in echter ONLINE umgebung dann auskommentieren 27/03/2024 16:33
             # thread.start() #TODO: in echter ONLINE umgebung dann auskommentieren 27/03/2024 16:33
             self.LoadTrainData(start_time, end_time) #loads data into ThermalErro and Inputs
             self.MT_General_Data.Padding_Row_Indices, self.MT_General_Data.time_jump_indices = self.apply_time_jumps() #Timestamps where a jump occurs for each key
-            self.Active_Compensation(measurementFrequency)
+            self.Active_Compensation(ModelFrequency)
         else:
             raise SystemExit('Error: Unknown Machine Mode, currently implemented "Sim", "Compensation" or "Log".')
 
@@ -304,13 +305,13 @@ class MT:
             time_jump_indices_dict[key] = time_jump_indices
         return time_jumps_dict, time_jump_indices_dict
 
-    def Active_Compensation(self, measurementFrequency):
+    def Active_Compensation(self, ModelFrequency):
         '''
         - This def will be used to run the architecture of the compensation model in a ONLINE environment
         '''
         #Initalization of the Active Compensation
         #Input_names = [col for col in self.Inputs.columns if col != 'Time']
-        self.Class_Comp = ActiveCompensation(self.Inputs, self.ThermalError, self.MT_General_Data, measurementFrequency, self.InfluxDBQuery, self.Machine.SensorList, self.TempSensors, self.Compensation_Steps)
+        self.Class_Comp = ActiveCompensation(self.Inputs, self.ThermalError, self.MT_General_Data, ModelFrequency, self.InfluxDBQuery, self.Machine.SensorList, self.TempSensors, self.Compensation_Steps)
         # For Error Feedback to MT
         self.Class_Comp.Error_Corrections = self.AGATHON_Com
         # Load Data into Datamanager
@@ -324,7 +325,7 @@ class MT:
             self.MT_General_Data.SelectedInputs_Train = {}
             self.MT_General_Data.Selected_Input_Names = {}
             for key in self.MT_General_Data.Train_Input_bucket.keys():
-                selected_inputs_train, selected_input_names = self.InputSelection.InputSelectionModel(self.MT_General_Data.Train_Input_bucket[key], self.MT_General_Data.Train_Output_bucket[key])
+                selected_inputs_train, selected_input_names = self.InputSelection.InputSelectionModel(self.MT_General_Data.Train_Input_bucket[key], self.MT_General_Data.Train_Output_bucket[key], self.MT_General_Data.time_jump_indices[key])
                 self.MT_General_Data.SelectedInputs_Train[key] = selected_inputs_train
                 self.MT_General_Data.Selected_Input_Names[key] = selected_input_names
             self.Class_Comp.Input_train = self.MT_General_Data.SelectedInputs_Train
@@ -361,7 +362,7 @@ class MT:
             self.MT_General_Data.SelectedInputs_Train = {}
             self.MT_General_Data.Selected_Input_Names = {}
             for key in self.MT_General_Data.Train_Input_bucket.keys():
-                selected_inputs_train, selected_input_names = self.InputSelection.InputSelectionModel(self.MT_General_Data.Train_Input_bucket[key], self.MT_General_Data.Train_Output_bucket[key])
+                selected_inputs_train, selected_input_names = self.InputSelection.InputSelectionModel(self.MT_General_Data.Train_Input_bucket[key], self.MT_General_Data.Train_Output_bucket[key], self.MT_General_Data.time_jump_indices[key])
                 self.MT_General_Data.SelectedInputs_Train[key] = selected_inputs_train
                 self.MT_General_Data.Selected_Input_Names[key] = selected_input_names
             self.Class_Sim.Input_train = self.MT_General_Data.SelectedInputs_Train

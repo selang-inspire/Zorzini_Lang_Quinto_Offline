@@ -45,8 +45,10 @@ class AGATHON_Com:
 
     def Read_State_Interpreter(self):
         # Read previous status from IP
+        #read reference file
         source_file = self.IP_Log_File
         source = source_file.replace("IpInputLog4R.tmp", "initial_IpInputLog4R.tmp")
+        #open the file
         logf = open(source, "r")
         IP_Params = logf.read()
         entries = IP_Params.split(";")
@@ -133,7 +135,7 @@ class AGATHON_Com:
             self.Prediction.loc[locnr, "Pivot C2B LR"] + self.IP_Comp_Values.loc[0, "Pivot C2B LR"]) + " ;" + "\n"
         Pivot_RR = "PivotC2B_4RR = " + str(
             self.Prediction.loc[locnr, "Pivot C2B RR"] + self.IP_Comp_Values.loc[0, "Pivot C2B RR"]) + " ;" + "\n"
-        contents_new = X_LR + Y_LR + Z_LR + X_RR + Y_RR + Z_RR + Anvil_LR + Anvil_RR + Pivot_LR + Pivot_RR
+        contents_new = X_LR + Y_LR + Z_LR + Anvil_LR + Pivot_LR + X_RR + Y_RR + Z_RR + Anvil_RR + Pivot_RR
         # Write Compensation TxT
         f.write(contents_new)
         f.close()
@@ -197,5 +199,5 @@ class AGATHON_Com:
         self.Read_State_Interpreter()
         # ReadTxt from overwrite file, which is subsequently modified
         self.Write_Interpreter_Overwrite_Test()
-        #self.Write_Interpreter_Overwrite()
+        #self.Write_Interpreter_Overwrite() #for ONLINE compensation on MT
         self.runJSON() #onyl for Testing

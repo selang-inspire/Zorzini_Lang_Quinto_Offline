@@ -28,16 +28,20 @@ class Input_selection:
         self.Selected_Input_Names = None #List of the selected Inputs
 
 
-    def InputSelectionModel(self, Train_Input_bucket, Train_Output_bucket):
+    def InputSelectionModel(self, Train_Input_bucket, Train_Output_bucket, NaNRows):
         '''
         - The Input Selection Model is called here
         - The Input Selection Model is used to select the inputs for the compensation model
         - The inputs are selected according to the models called from here
         - If no model available, the initial data is used
         '''
+        #Where padding
+        self.indices_forNaN = NaNRows
         #Initialize the Data
         self.InitialData = Train_Input_bucket
         self.Target_Data = Train_Output_bucket
+        # delete values indices to match training data length
+        self.indices_forNaN = [i for i in self.indices_forNaN if i < len(self.InitialData)]
         #Normalize the Data
         self.Input_Normalized_Data = self.MT_data.z_score_normalization(self.InitialData, True)
         self.Target_Normalized_Data = self.MT_data.z_score_normalization(self.Target_Data, True)
@@ -162,6 +166,7 @@ class Input_selection:
         - This function will return the lagged Input data & Target data
         '''
         # Define the number of time steps for the lagged features (look behind values)
+        # max_lag = 3 #for debugging
         lag_list = np.arange(1, max_lag+1)
 
         # Initialize the combined dataframes
@@ -175,6 +180,13 @@ class Input_selection:
         Pre_Selected_Temp_data_combined = Pre_Selected_Temp_data_combined.dropna(axis=1)
         Orig_Pre_Selected_Temp_data_combined = Orig_Pre_Selected_Temp_data_combined.dropna(axis=1)
 
+        #insert NaN values in each row of the dataframe at indices which are contained the the list self.indices_forNaN
+        if max_lag != 0:
+            for i in self.indices_forNaN:
+                Pre_Selected_Temp_data_combined.iloc[i] = np.nan
+                Orig_Pre_Selected_Temp_data_combined.iloc[i] = np.nan
+                target_scaled.iloc[i] = np.nan
+                Orig_target_scaled.iloc[i] = np.nan
         # Iterate over the lag_list and create lagged features for each lag
         for lag in lag_list:
             # Create a DataFrame with NaN values
