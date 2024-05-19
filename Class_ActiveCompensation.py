@@ -84,6 +84,7 @@ class ActiveCompensation:
         - This def will get the actual input data from the InfluxDB
         - The data is loaded from the InfluxDB and put into a nice table layout
         '''
+        self.Actual_Input_DF = None
         InputNames, time_res, time_res_energy, results = self.InfluxDBQuery.query(start_iso=None, end_iso=None)
         del time_res_energy
         Actual_Input_DF = self.MT_general.Table_Layout_Panda(time_res, InputNames, results)
@@ -102,9 +103,22 @@ class ActiveCompensation:
         columns_to_check = [col for col in self.Actual_Input_DF.columns if col != 'Time']
         # Apply the operation to the selected columns
         self.Actual_Input_DF[columns_to_check] = self.Actual_Input_DF[columns_to_check].map(lambda val: np.nan if val < 0.05 else val)
-        if self.Actual_Input_DF.isnull().values.any():
-            self.Actual_Input_DF.ffill(inplace=True)
-            print("\033[91mNaN values were replaced with the previous value\033[0m")
+        # Iterate over each column in the DataFrame
+        # Iterate over each column in the DataFrame
+        for column in self.Actual_Input_DF.columns:
+            # Check if the column has any NaN values
+            if self.Actual_Input_DF[column].isnull().any():
+                # Get the index (time value) of the NaN values
+                nan_times = self.Actual_Input_DF[self.Actual_Input_DF[column].isnull()].index
+                # Create a copy of the DataFrame before forward fill
+                df_before_fill = self.Actual_Input_DF.copy()
+                # Forward fill the NaN values in the column
+                self.Actual_Input_DF[column].ffill(inplace=True)
+                # Print the column name, the time values and the inserted values where NaN values were replaced
+                for time in nan_times:
+                    inserted_value = self.Actual_Input_DF.loc[time, column]
+                    print(
+                        f"\033[91mNaN value in column '{column}' at Row '{time}' was replaced with the value {inserted_value}\033[0m")
         # Check if there are any NaN values in the 'Time' column
         if self.Actual_Input_DF['Time'].isnull().any():
             # Fill NaN values with the current datetime
