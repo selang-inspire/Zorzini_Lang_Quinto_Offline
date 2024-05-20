@@ -16,7 +16,7 @@ class ActiveCompensation:
     - The training data is normalized
     - The test data is normalized using the mean and std. dev. of the training data
     '''
-    def __init__(self, Input, Error, MT_General, ModelFrequency, InfluxDB, TempSensorsnames, TemperatureSensors, Compensation_Steps):
+    def __init__(self, Input, Error, MT_General, ModelFrequency, InfluxDB, TempSensorsnames, TemperatureSensors, Compensation_Steps, energy, power, indig):
         # Initialization
         self.TempSensors = TemperatureSensors # True if only Temperature sensors should be used
         self.TempSensorsNames = TempSensorsnames # Names of the Temperature Sensors #TODO: Change it to input names and not only temperature sensors
@@ -30,6 +30,7 @@ class ActiveCompensation:
         # How many predictions should the model make (to not go to infinity)
         self.Compensation_Steps = Compensation_Steps
         self.Error_Corrections = None
+        self.InternalInputsNames = energy + power + indig
 
     def Save_TrainData(self):
         '''
@@ -86,7 +87,7 @@ class ActiveCompensation:
         '''
         self.Actual_Input_DF = None
         InputNames, time_res, time_res_energy, results = self.InfluxDBQuery.query(start_iso=None, end_iso=None)
-        del time_res_energy
+        #del time_res_energy
         Actual_Input_DF = self.MT_general.Table_Layout_Panda(time_res, InputNames, results)
         ###Only TempData
         if self.TempSensors:
@@ -94,37 +95,50 @@ class ActiveCompensation:
             self.Actual_Input_DF = Actual_Input_DF.loc[:, Temp_sensor_extract]
             if step == 0:
                 self.LastRecentTemp = self.Actual_Input_DF.drop(self.Actual_Input_DF.index[-1])
+            columns_to_check = [col for col in self.Actual_Input_DF.columns if col != 'Time']
+            # Apply the operation to the selected columns
+            self.Actual_Input_DF[columns_to_check] = self.Actual_Input_DF[columns_to_check].map(lambda val: np.nan if val < 7 else val)
+            # Iterate over each column in the DataFrame
+            for column in self.Actual_Input_DF.columns:
+                # Check if the column has any NaN values
+                if self.Actual_Input_DF[column].isnull().any():
+                    # Get the index (time value) of the NaN values
+                    nan_times = self.Actual_Input_DF[self.Actual_Input_DF[column].isnull()].index
+                    # Create a copy of the DataFrame before forward fill
+                    df_before_fill = self.Actual_Input_DF.copy()
+                    # Forward fill the NaN values in the column
+                    self.Actual_Input_DF[column].ffill(inplace=True)
+                    # Print the column name, the time values and the inserted values where NaN values were replaced
+                    for time in nan_times:
+                        inserted_value = self.Actual_Input_DF.loc[time, column]
+                        print(f"\033[91mNaN value in column '{column}' at Row '{time}' was replaced with the value {inserted_value}\033[0m")
+            # Check if there are any NaN values in the 'Time' column
+            if self.Actual_Input_DF['Time'].isnull().any():
+                # Fill NaN values with the current datetime
+                self.Actual_Input_DF['Time'].fillna(datetime.now(), inplace=True)
+                print("\033[91mNaN values for Time, therefore actual Time was set\033[0m")
         else:
             self.Actual_Input_DF = Actual_Input_DF
         ############################################################################################################
         #TODO: This part must be changed if other Inputs than temperature is considered
         # if last row of self.Actual_Input_DF contains 0 values then fill only where the zero is with the value from the previous row
         # Exclude 'Time' column
-        columns_to_check = [col for col in self.Actual_Input_DF.columns if col != 'Time']
-        # Apply the operation to the selected columns
-        self.Actual_Input_DF[columns_to_check] = self.Actual_Input_DF[columns_to_check].map(lambda val: np.nan if val < 0.05 else val)
-        # Iterate over each column in the DataFrame
-        # Iterate over each column in the DataFrame
-        for column in self.Actual_Input_DF.columns:
-            # Check if the column has any NaN values
-            if self.Actual_Input_DF[column].isnull().any():
-                # Get the index (time value) of the NaN values
-                nan_times = self.Actual_Input_DF[self.Actual_Input_DF[column].isnull()].index
-                # Create a copy of the DataFrame before forward fill
-                df_before_fill = self.Actual_Input_DF.copy()
-                # Forward fill the NaN values in the column
-                self.Actual_Input_DF[column].ffill(inplace=True)
-                # Print the column name, the time values and the inserted values where NaN values were replaced
-                for time in nan_times:
-                    inserted_value = self.Actual_Input_DF.loc[time, column]
-                    print(
-                        f"\033[91mNaN value in column '{column}' at Row '{time}' was replaced with the value {inserted_value}\033[0m")
-        # Check if there are any NaN values in the 'Time' column
-        if self.Actual_Input_DF['Time'].isnull().any():
-            # Fill NaN values with the current datetime
-            self.Actual_Input_DF['Time'].fillna(datetime.now(), inplace=True)
-            print("\033[91mNaN values for Time, therefore actual Time was set\033[0m")
+        Actual_Input_InternalData = self.MT_general.Table_Layout_Panda(time_res_energy, InputNames, results)
+        InternalDataExtract = self.InternalInputsNames
+        Actual_Input_InternalData = Actual_Input_InternalData.loc[:, InternalDataExtract]
+        """
+        Actual_Input_InternalData = Actual_Input_InternalData.loc[:, InternalDataExtract]
+        #make moving average with windowsize 20 on InternalDataExtract except on Time column
+        moving_average = False
+        if moving_average:
+            MA_Actual_Input_InternalData = Actual_Input_InternalData.copy()
+            MA_Actual_Input_InternalData[InternalDataExtract[1:]] = Actual_Input_InternalData[InternalDataExtract[1:]].rolling(window=20).mean()
+            #insert first 20 rows into MA_Actual_Input_InternalData
+            MA_Actual_Input_InternalData.iloc[0:20] = Actual_Input_InternalData.iloc[0:20]
+        """
         ############################################################################################################
+        # concatenate the InternalData to the Temperature Data
+        self.Actual_Input_DF = pd.concat([self.Actual_Input_DF, Actual_Input_InternalData], axis=1)
         self.Actual_Input_DF = self.Actual_Input_DF.tail(1) # get newest one (letzte zeile)
         ###Only TempData end###
         self.current_time = self.Actual_Input_DF['Time'].iloc[-1] # get actual time
@@ -160,6 +174,7 @@ class ActiveCompensation:
                 actual_columns = actualDFCopy.columns
                 columns_to_drop = [col for col in actual_columns if col not in valid_columns]
                 actualDFCopy = actualDFCopy.drop(columns=columns_to_drop)
+                actualDFCopy = actualDFCopy.T.loc[~actualDFCopy.T.index.duplicated(keep='first')].T
                 self.selected_input_test[key] = actualDFCopy
 
         for key in self.MT_general.Full_Input_bucket.keys():
@@ -198,6 +213,7 @@ class ActiveCompensation:
                     if column != 'Time':
                         self.LastRecentTemp_dict[key].loc[:, column] = self.LastRecentTemp_dict[key][column] - self.MT_general.Reference_Input[key][column].values[0]
         # check values if they are in an appropriate range
+        """
         for keys in self.selected_input_test.keys():
             # Create a copy of the DataFrame excluding the 'Time' column
             df_without_time = self.selected_input_test[keys].drop(columns='Time')
@@ -206,6 +222,7 @@ class ActiveCompensation:
                 print("\033[91mInput Data is not in an appropriate range\033[0m")
                 breakpoint()  # for debugging
                 # exit()
+        """
         self.Upload_Inputs_ToInflux() # Upload the actual input data to the InfluxDB
 
     def Upload_Inputs_ToInflux(self):

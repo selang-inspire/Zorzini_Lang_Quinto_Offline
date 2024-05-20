@@ -311,7 +311,7 @@ class MT:
         '''
         #Initalization of the Active Compensation
         #Input_names = [col for col in self.Inputs.columns if col != 'Time']
-        self.Class_Comp = ActiveCompensation(self.Inputs, self.ThermalError, self.MT_General_Data, ModelFrequency, self.InfluxDBQuery, self.Machine.SensorList, self.TempSensors, self.Compensation_Steps)
+        self.Class_Comp = ActiveCompensation(self.Inputs, self.ThermalError, self.MT_General_Data, ModelFrequency, self.InfluxDBQuery, self.Machine.SensorList, self.TempSensors, self.Compensation_Steps, self.Machine.EnergySet, self.Machine.PowerSet, self.Machine.IndigTempSet)
         # For Error Feedback to MT
         self.Class_Comp.Error_Corrections = self.AGATHON_Com
         # Load Data into Datamanager

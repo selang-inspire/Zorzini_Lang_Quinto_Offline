@@ -645,7 +645,7 @@ class EVO_Quinto:
         # Formula for calculating the standard deviation
         #std_dev = np.std(Error_dict['X0B']['Wert_4'])
         #print("The standard deviation is:", std_dev)
-
+        """
         #Calculate the difference before and after 90° rotation
         #Delta Y0B = Y0B_2 - Y0B Y0C
         #Error_dict['Y0C'] = Error_dict['Y0B_2'].copy()
@@ -653,7 +653,21 @@ class EVO_Quinto:
         Error_dict['Y0C']['Wert_1'] = 'Y0C'
         #mean of Time in Error_dict['Y0B_2']['Time'] and Error_dict['Y0B']['Time']
         Error_dict['Y0C']['Time'] = Error_dict['Y0B']['Time'] + (Error_dict['Y0B_2']['Time']-Error_dict['Y0B']['Time'])/2
-
+        """
+        # More Stable Calculation
+        # Delta Y0B = Y0B_2 - Y0B Y0C
+        Error_dict['Y0B_2']['Time'] = pd.to_datetime(Error_dict['Y0B_2']['Time'])
+        Error_dict['Y0B']['Time'] = pd.to_datetime(Error_dict['Y0B']['Time'])
+        # Step 2: Merge on 'Time' with a tolerance of 3 minutes
+        df_temp = Error_dict['Y0B'].sort_values('Time').copy()
+        df_temp['Original_Time'] = df_temp['Time']
+        # Perform the merge
+        merged_df = pd.merge_asof(Error_dict['Y0B_2'].sort_values('Time'), df_temp, on='Time',tolerance=pd.Timedelta(minutes=3), direction='nearest')
+        merged_df['Wert_4_diff'] = merged_df['Wert_4_x'] - merged_df['Wert_4_y']
+        Error_dict['Y0C']['Wert_4'] = merged_df['Wert_4_diff']
+        Error_dict['Y0C']['Wert_1'] = 'Y0C'
+        Error_dict['Y0C']['Time'] = merged_df['Original_Time'] + (merged_df['Time'] - merged_df['Original_Time']) / 2
+        del merged_df, df_temp
         #------------------------------------------------------------------------------------------
         #Delta X0B = X0B_2 - X0B X0C
         Error_dict['X0B_2']['Time'] = pd.to_datetime(Error_dict['X0B_2']['Time'])
