@@ -43,10 +43,10 @@ ModelFrequency=10 #Model (not measurement) frequency in seconds for read-in new 
 measurementFrequency=5 #Measurement frequency in seconds for drives and other recorded values
 log_file_name =  "D:\\MainThermokompensation\\Messdaten\\Log_AP_26_04_2024.csv"#"C:\\Users\\Admin.AGATHON-7OEU3S8\\Desktop\\MainThermokompensation\\Messdaten\\Log_AP_22_02_2024.csv"
 LogInfluxFrequency=10 #TODO Log only at logfrequency, measure and aggregate average/filter? at measurementFrequency currently not implemented
-model_directory = "C:\\Users\\mzorzini\\OneDrive - ETH Zurich\\Zorzini_Inspire\\Semester_Project\\03_Python_Scripts\\Models_Storage"
+model_directory = "C:\\Users\\mzorzini\\PycharmProjects\\Zorzini_Lang_Quinto_Offline\\Trained_Models"
 Comp_Model = 'ARX' #None, "ARX", "FFNN", "LSTM" define which Model to use for compensation
 Input_Selection_Model = None #None, 'LASSO', 'Group LASSO'
-save_load_model = False #True: Load or Save Model
+save_load_model = False #True: Load or Save Model, To save a Model Input selection must be active else it won't work
 # -------------------------------------------------------------------------------------------------------------------------------------------------------
 # Feature Set Selection
 TemperatureSensors = True #True: Only Temperature Sensors will be used
